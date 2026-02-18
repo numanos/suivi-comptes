@@ -100,6 +100,10 @@ c426378 Log only duplicates detected
 acbc6aa Add duplicate confirmation modal for CSV import
 c5698c0 Add debug logging for dryRun
 5a5b6b9 Fix: re-add duplicate rows when user chooses to import all
+3ee8bc1 Update context with latest changes
+6305c05 Add debug logging for dashboard
+2a24a78 Fix: convert month/year to numbers for comparison
+03cd8ef Fix expenses calculation to exclude savings, add filters for transactions
 ```
 
 ## Problèmes et corrections effectuées
@@ -124,6 +128,14 @@ c5698c0 Add debug logging for dryRun
 - **Problème:** Des paiements différents mais avec même libellé et montant étaient détectés comme doublons
 - **Solution:** Ajout d'une fenêtre de confirmation qui affiche les doublons détectés et laisse le choix à l'utilisateur d'importer ou non
 
+### 6. Calcul des dépenses incorrect
+- **Problème:** Les dépenses incluaient l'épargne (catégorie Epargne)
+- **Solution:** Modification des requêtes SQL pour ne inclure que les catégories des thèmes "Dépenses fixes" et "Dépenses variables"
+
+### 7. Type des données dans le dashboard
+- **Problème:** MySQL retourne month et year comme strings, la comparaison échouait
+- **Solution:** Conversion avec Number() dans le frontend
+
 ## Fonctionnalités implémentées
 
 ### Import CSV
@@ -136,7 +148,7 @@ c5698c0 Add debug logging for dryRun
   3. Annuler
 
 ### Gestion des transactions
-- Liste avec filtres par année/mois
+- Liste avec filtres par année/mois/libellé/catégorie/sous-catégorie
 - Édition (libellé, note, catégorie, sous-catégorie)
 - Suppression simple et suppression en masse
 - Selection multiple avec case à cocher
