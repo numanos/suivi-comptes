@@ -188,6 +188,37 @@ export default function EnveloppesPage() {
     }
   };
 
+  const handleCopyFromPreviousYear = async (envelopeId: number) => {
+    if (!confirm('Copier les placements de l\'année précédente ? Les valorisations seront à mettre à jour.')) return;
+    
+    try {
+      const res = await fetch(`/api/patrimoine/placements?envelope_id=${envelopeId}&year=${parseInt(year) - 1}`);
+      const previousPlacements = await res.json();
+      
+      for (const p of previousPlacements) {
+        await fetch('/api/patrimoine/placements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            envelope_id: envelopeId,
+            name: p.name,
+            type_placement: p.type_placement,
+            year: parseInt(year),
+            valorization: 0
+          })
+        });
+      }
+      fetchEnvelopes();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+      fetchEnvelopes();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const openEditPlacement = (placement: Placement) => {
     setEditingPlacement(placement);
     setEditPlacementName(placement.name);
@@ -449,6 +480,15 @@ export default function EnveloppesPage() {
                     >
                       Modifier
                     </button>
+                    {parseInt(year) > 2020 && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => handleCopyFromPreviousYear(envelope.id)}
+                        title="Copier les placements de l'année précédente"
+                      >
+                        ↻ Année N-1
+                      </button>
+                    )}
                     <button
                       className="btn btn-danger"
                       onClick={() => handleDeleteEnvelope(envelope.id)}
