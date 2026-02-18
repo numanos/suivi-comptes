@@ -15,6 +15,7 @@ interface Envelope {
   id: number;
   name: string;
   versements: number;
+  exclude_from_gains: boolean;
   placements: Placement[];
 }
 
@@ -35,6 +36,7 @@ export default function EnveloppesPage() {
   const [newEnvelopeName, setNewEnvelopeName] = useState('');
   const [newEnvelopeVersements, setNewEnvelopeVersements] = useState('');
   const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
+  const [editExcludeFromGains, setEditExcludeFromGains] = useState(false);
   
   const [newPlacementName, setNewPlacementName] = useState('');
   const [newPlacementType, setNewPlacementType] = useState('Action');
@@ -100,7 +102,8 @@ export default function EnveloppesPage() {
         body: JSON.stringify({
           id: editingEnvelope.id,
           name: editingEnvelope.name,
-          versements: parseFloat(editEnvelopeVersements) || 0
+          versements: parseFloat(editEnvelopeVersements) || 0,
+          exclude_from_gains: editExcludeFromGains
         })
       });
       setShowEditEnvelope(false);
@@ -288,6 +291,17 @@ export default function EnveloppesPage() {
                   onChange={(e) => setEditEnvelopeVersements(e.target.value)}
                 />
               </div>
+              <div className="form-group">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={editExcludeFromGains}
+                    onChange={(e) => setEditExcludeFromGains(e.target.checked)}
+                  />
+                  Exclure du calcul des gains
+                </label>
+                <small style={{ color: 'var(--text-light)' }}>Cochez pour les livrets bancaires (liquidités de secours)</small>
+              </div>
               <button type="submit" className="btn btn-primary">Enregistrer</button>
             </form>
           </div>
@@ -400,7 +414,7 @@ export default function EnveloppesPage() {
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {envelopes.map((envelope) => {
             const totalValorization = envelope.placements.reduce((sum, p) => sum + (Number(p.valorization) || 0), 0);
-            const gain = totalValorization - (Number(envelope.versements) || 0);
+            const gain = envelope.exclude_from_gains ? null : totalValorization - (Number(envelope.versements) || 0);
             
             return (
               <div key={envelope.id} className="card">
@@ -408,13 +422,15 @@ export default function EnveloppesPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <h2 className="card-title">{envelope.name}</h2>
                     <span className="badge badge-secondary">{formatAmount(envelope.versements)} versés</span>
+                    {envelope.exclude_from_gains && <span className="badge badge-warning">Gain désactivé</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                       className="btn btn-secondary"
                       onClick={() => {
                         setEditingEnvelope(envelope);
-                        setEditEnvelopeVersements(envelope.versements.toString());
+                        setEditEnvelopeVersements(envelope.versements?.toString() || '0');
+                        setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}
                     >
@@ -444,11 +460,17 @@ export default function EnveloppesPage() {
                   <>
                     <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
                       <span>Valorisation {year}: <strong>{formatAmount(totalValorization)}</strong></span>
-                      <span style={{ marginLeft: '1rem' }}>
-                        Gain: <span className={gain >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                          {formatAmount(gain)} ({envelope.versements > 0 ? (gain / envelope.versements * 100).toFixed(1) : '0'}%)
+                      {envelope.exclude_from_gains ? (
+                        <span style={{ marginLeft: '1rem', color: 'var(--text-light)' }}>
+                          <em>(Calcul des gains désactivé)</em>
                         </span>
-                      </span>
+                      ) : (
+                        <span style={{ marginLeft: '1rem' }}>
+                          Gain: <span className={gain !== null && gain >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                            {gain !== null ? formatAmount(gain) : '-'} ({envelope.versements > 0 ? (gain! / envelope.versements * 100).toFixed(1) : '0'}%)
+                          </span>
+                        </span>
+                      )}
                     </div>
                     <div className="table-container">
                       <table className="table">

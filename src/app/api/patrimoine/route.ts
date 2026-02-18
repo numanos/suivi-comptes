@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       const targetYear = year || new Date().getFullYear();
       
       const envelopes = await query(`
-        SELECT e.id, e.name, e.versements,
+        SELECT e.id, e.name, e.versements, e.exclude_from_gains,
                p.id as placement_id, p.name as placement_name, 
                p.type_placement, p.year, p.valorization
         FROM envelopes e
@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
             id: row.id,
             name: row.name,
             versements: row.versements || 0,
+            exclude_from_gains: Boolean(row.exclude_from_gains),
             placements: []
           });
         }
@@ -202,15 +203,15 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, name, versements } = await request.json();
+    const { id, name, versements, exclude_from_gains } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'ID requis' }, { status: 400 });
     }
 
     await query(
-      'UPDATE envelopes SET name = ?, versements = ? WHERE id = ?',
-      [name || '', versements || 0, id]
+      'UPDATE envelopes SET name = ?, versements = ?, exclude_from_gains = ? WHERE id = ?',
+      [name || '', versements || 0, exclude_from_gains ? true : false, id]
     );
 
     return NextResponse.json({ success: true });
