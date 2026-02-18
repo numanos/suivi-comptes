@@ -85,6 +85,12 @@ export default function BudgetPage() {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    if (!filterLibelle && !filterCategory && !filterSubcategory) {
+      fetchTransactions();
+    }
+  }, [filterLibelle, filterCategory, filterSubcategory]);
+
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault();
     setImporting(true);
@@ -338,7 +344,6 @@ export default function BudgetPage() {
               setFilterLibelle('');
               setFilterCategory('');
               setFilterSubcategory('');
-              setTimeout(() => fetchTransactions(), 0);
             }}>
               Effacer filtres
             </button>

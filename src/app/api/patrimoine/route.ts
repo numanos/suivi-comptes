@@ -151,6 +151,16 @@ export async function GET(request: NextRequest) {
 
       const prevTotal = Object.values(prevTotals).reduce((a: number, b: number) => a + b, 0);
 
+      const versementsResult = await query(`
+        SELECT SUM(versements) as total FROM envelope_versements WHERE year = ?
+      `, [targetYear]) as any[];
+      const yearVersements = Number(versementsResult[0]?.total) || 0;
+
+      const prevVersementsResult = await query(`
+        SELECT SUM(versements) as total FROM envelope_versements WHERE year = ?
+      `, [prevYear]) as any[];
+      const prevYearVersements = Number(prevVersementsResult[0]?.total) || 0;
+
       const summary = {
         year: targetYear,
         prevYear,
@@ -159,6 +169,8 @@ export async function GET(request: NextRequest) {
         total,
         prevTotals,
         prevTotal,
+        yearVersements,
+        prevYearVersements,
         evolution: hasDataForYear ? {
           Action: totals['Action'] - prevTotals['Action'],
           Immo: totals['Immo'] - prevTotals['Immo'],
