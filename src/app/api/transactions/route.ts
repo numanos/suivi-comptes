@@ -49,34 +49,39 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Convert ISO-8859-1 to UTF-8 - simplified version
-function convertToUtf8(text: string): string {
-  // Just use the built-in TextDecoder which handles encoding
-  const bytes = new Uint8Array(text.split('').map(c => c.charCodeAt(0)));
-  const decoder = new TextDecoder('iso-8859-1');
-  return decoder.decode(bytes);
-}
-
-// Normalize string for comparison (remove accents, lowercase)
-function normalizeStr(str: string): string {
+// Simple normalize for comparison - lowercase and remove accents
+function normalizeForMatch(str: string): string {
   if (!str) return '';
   return str.toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remove accents
-    .replace(/[^a-z0-9]/g, ''); // Remove special chars
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '');
 }
 
 async function findOrCreateCategory(categoryName: string, themeId: number): Promise<number> {
   if (!categoryName || !categoryName.trim()) {
     categoryName = 'Autres';
   }
-  const normName = normalizeStr(categoryName);
+  
+  // Try to find existing by exact match first
   const existing = await query(
-    'SELECT id FROM categories WHERE REPLACE(LOWER(name), "é", "e") = ? OR REPLACE(LOWER(name), "è", "e") = ? OR LOWER(name) = ?',
-    [normName, normName, categoryName.toLowerCase()]
+    'SELECT id FROM categories WHERE name = ?',
+    [categoryName.trim()]
   ) as any[];
   
   if (existing.length > 0) return existing[0].id;
   
+  // Try to find by normalized match
+  const normName = normalizeForMatch(categoryName);
+  const allCats = await query('SELECT id, name FROM categories') as any[];
+  
+  for (const cat of allCats) {
+    if (normalizeForMatch(cat.name) === normName) {
+      return cat.id;
+    }
+  }
+  
+  // Create new
   const result = await query(
     'INSERT INTO categories (name, theme_id) VALUES (?, ?)',
     [categoryName.trim(), themeId]
@@ -89,14 +94,26 @@ async function findOrCreateSubcategory(subcategoryName: string, categoryId: numb
   if (!subcategoryName || !subcategoryName.trim()) {
     return 0;
   }
-  const normName = normalizeStr(subcategoryName);
+  
+  // Try exact match
   const existing = await query(
-    'SELECT id FROM subcategories WHERE LOWER(name) = ?',
-    [subcategoryName.toLowerCase()]
+    'SELECT id FROM subcategories WHERE name = ? AND category_id = ?',
+    [subcategoryName.trim(), categoryId]
   ) as any[];
   
   if (existing.length > 0) return existing[0].id;
   
+  // Try normalized match
+  const normName = normalizeForMatch(subcategoryName);
+  const allSubs = await query('SELECT id, name, category_id FROM subcategories WHERE category_id = ?', [categoryId]) as any[];
+  
+  for (const sub of allSubs) {
+    if (normalizeForMatch(sub.name) === normName) {
+      return sub.id;
+    }
+  }
+  
+  // Create new
   const result = await query(
     'INSERT INTO subcategories (name, category_id) VALUES (?, ?)',
     [subcategoryName.trim(), categoryId]
@@ -107,7 +124,7 @@ async function findOrCreateSubcategory(subcategoryName: string, categoryId: numb
 
 function guessTheme(categoryName: string): number {
   if (!categoryName) return 2;
-  const name = normalizeStr(categoryName);
+  const name = normalizeForMatch(categoryName);
   if (name.includes('epargne') || name.includes('assurance') || name.includes('livret') || name.includes('placement')) return 4;
   if (name.includes('salaire') || name.includes('revenu') || name.includes('allocation') || name.includes('autresrevenus')) return 3;
   if (name.includes('impot') || name.includes('taxe') || name.includes('logement') || name.includes('credit') || name.includes('loyer')) return 1;
@@ -116,9 +133,10 @@ function guessTheme(categoryName: string): number {
 
 async function transactionExists(date: string, libelle: string, amount: number): Promise<boolean> {
   if (!libelle || !date) return false;
+  // Check exact match on date + libelle + amount
   const existing = await query(
-    'SELECT id FROM transactions WHERE date = ? AND LOWER(libelle) = LOWER(?) AND amount = ? LIMIT 1',
-    [date, libelle.substring(0, 255), amount]
+    'SELECT id FROM transactions WHERE date = ? AND libelle = ? AND amount = ? LIMIT 1',
+    [date, libelle, amount]
   ) as any[];
   return existing.length > 0;
 }
@@ -158,11 +176,8 @@ export async function POST(request: NextRequest) {
 
     let text = await file.text();
     
-    // Normalize line endings first
+    // Normalize line endings
     text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    
-    // Convert encoding BEFORE parsing
-    text = convertToUtf8(text);
     
     const lines = text.split('\n').filter(line => line.trim());
     
@@ -174,14 +189,14 @@ export async function POST(request: NextRequest) {
     const headerLine = lines[0];
     const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().trim());
     
-    console.log('Headers after encoding:', headers);
+    console.log('Headers:', headers);
     
-    // Find column indices - check multiple patterns
+    // Find column indices - use includes for fuzzy matching
     const dateIdx = headers.findIndex(h => h === 'date');
     const libelleIdx = headers.findIndex(h => h.includes('libell'));
     const noteIdx = headers.findIndex(h => h.includes('note'));
     const montantIdx = headers.findIndex(h => h.includes('montant'));
-    const categorieIdx = headers.findIndex(h => h.includes('categor'));
+    const categorieIdx = headers.findIndex(h => h.includes('categor') || h.includes('cat'));
     const sousCatIdx = headers.findIndex(h => h.includes('sous'));
     const soldeIdx = headers.findIndex(h => h.includes('solde'));
     
@@ -191,7 +206,7 @@ export async function POST(request: NextRequest) {
     const data: any[] = [];
     for (let i = 1; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
-      if (values.length >= 4) { // At least date, libelle, amount, category
+      if (values.length >= 4) {
         data.push(values);
       }
     }
@@ -210,37 +225,39 @@ export async function POST(request: NextRequest) {
 
     // Get existing categories
     const [categories] = await connection.query(`
-      SELECT c.id, c.name, c.theme_id, GROUP_CONCAT(s.name) as subcategory_names
+      SELECT c.id, c.name, c.theme_id
       FROM categories c
-      LEFT JOIN subcategories s ON s.category_id = c.id
-      GROUP BY c.id
     `) as any[];
 
-    const categoryMap = new Map();
-    const categoryIdMap = new Map<number, string>(); // category ID -> name for lookup
+    // Build lookup maps
+    const categoryById = new Map<number, any>();
+    const categoryByName = new Map<string, any>();
+    const categoryByNormalized = new Map<string, any>();
     
     for (const cat of categories) {
-      const normName = normalizeStr(cat.name);
-      categoryMap.set(normName, { id: cat.id, themeId: cat.theme_id });
-      categoryMap.set(cat.name.toLowerCase(), { id: cat.id, themeId: cat.theme_id });
-      categoryIdMap.set(cat.id, cat.name);
-      
-      if (cat.subcategory_names) {
-        const subs = cat.subcategory_names.split(',');
-        for (const sub of subs) {
-          categoryMap.set(normalizeStr(sub), { categoryId: cat.id, subName: sub });
-          categoryMap.set(sub.toLowerCase(), { categoryId: cat.id, subName: sub });
-        }
-      }
+      categoryById.set(cat.id, cat);
+      categoryByName.set(cat.name.toLowerCase(), cat);
+      categoryByNormalized.set(normalizeForMatch(cat.name), cat);
     }
 
-    console.log('Category map:', Array.from(categoryMap.keys()).slice(0, 10));
+    // Get subcategories
+    const [subcategories] = await connection.query(`
+      SELECT s.id, s.name, s.category_id
+      FROM subcategories s
+    `) as any[];
+    
+    const subByName = new Map<string, any>();
+    for (const sub of subcategories) {
+      subByName.set(`${sub.category_id}|${sub.name.toLowerCase()}`, sub);
+      subByName.set(`${sub.category_id}|${normalizeForMatch(sub.name)}`, sub);
+    }
+
+    console.log('Categories loaded:', categories.length);
 
     let imported = 0;
     let skipped = 0;
     let newCategories = 0;
     let newSubcategories = 0;
-    const errors: string[] = [];
 
     for (let i = 0; i < data.length; i++) {
       try {
@@ -255,7 +272,7 @@ export async function POST(request: NextRequest) {
         const subcategoryName = sousCatIdx >= 0 && sousCatIdx < row.length ? row[sousCatIdx] : '';
         const balanceStr = soldeIdx >= 0 && soldeIdx < row.length ? row[soldeIdx] : '0';
 
-        // Parse date
+        // Parse date (format: DD/MM/YYYY)
         const dateParts = dateStr.split('/');
         let date = null;
         if (dateParts.length === 3) {
@@ -276,10 +293,10 @@ export async function POST(request: NextRequest) {
           balance = parseFloat(balanceClean);
         }
 
-        // Use libelle or category
+        // Use libelle or category as fallback
         const finalLibelle = libelle || categoryName || 'Transaction sans libellé';
 
-        // Check for duplicate
+        // Check for duplicate - exact match on date + libelle + amount
         if (await transactionExists(date, finalLibelle, amount)) {
           skipped++;
           continue;
@@ -290,36 +307,49 @@ export async function POST(request: NextRequest) {
         let subcategoryId: number | null = null;
 
         if (categoryName && categoryName.trim()) {
-          const normCat = normalizeStr(categoryName);
-          const catKey = categoryName.toLowerCase().trim();
+          const catLower = categoryName.toLowerCase();
+          const catNorm = normalizeForMatch(categoryName);
           
-          // Try to find existing category
-          if (categoryMap.has(normCat) || categoryMap.has(catKey)) {
-            const catData = categoryMap.get(normCat) || categoryMap.get(catKey);
-            categoryId = catData.id;
+          // Check exact match
+          if (categoryByName.has(catLower)) {
+            categoryId = categoryByName.get(catLower).id;
+          } else if (categoryByNormalized.has(catNorm)) {
+            categoryId = categoryByNormalized.get(catNorm).id;
           } else {
             // Create new category
             const themeId = guessTheme(categoryName);
-            categoryId = await findOrCreateCategory(categoryName.trim(), themeId);
+            const [result] = await connection.query(
+              'INSERT INTO categories (name, theme_id) VALUES (?, ?)',
+              [categoryName.trim(), themeId]
+            );
+            categoryId = (result as any).insertId;
             newCategories++;
-            categoryMap.set(normCat, { id: categoryId, themeId });
-            categoryIdMap.set(categoryId, categoryName);
+            
+            // Add to cache
+            categoryByName.set(catLower, { id: categoryId, name: categoryName });
+            categoryByNormalized.set(catNorm, { id: categoryId, name: categoryName });
           }
           
           // Find or create subcategory
           if (subcategoryName && subcategoryName.trim() && categoryId) {
-            const normSub = normalizeStr(subcategoryName);
-            const subKey = subcategoryName.toLowerCase().trim();
+            const subKey = `${categoryId}|${subcategoryName.toLowerCase()}`;
+            const subKeyNorm = `${categoryId}|${normalizeForMatch(subcategoryName)}`;
             
-            if (categoryMap.has(normSub) || categoryMap.has(subKey)) {
-              const subData = categoryMap.get(normSub) || categoryMap.get(subKey);
-              subcategoryId = subData.categoryId;
+            if (subByName.has(subKey)) {
+              subcategoryId = subByName.get(subKey).id;
+            } else if (subByName.has(subKeyNorm)) {
+              subcategoryId = subByName.get(subKeyNorm).id;
             } else {
-              subcategoryId = await findOrCreateSubcategory(subcategoryName.trim(), categoryId);
-              if (subcategoryId > 0) {
-                newSubcategories++;
-                categoryMap.set(normSub, { categoryId, subName: subcategoryName });
-              }
+              // Create new subcategory
+              const [result] = await connection.query(
+                'INSERT INTO subcategories (name, category_id) VALUES (?, ?)',
+                [subcategoryName.trim(), categoryId]
+              );
+              subcategoryId = (result as any).insertId;
+              newSubcategories++;
+              
+              // Add to cache
+              subByName.set(subKey, { id: subcategoryId, name: subcategoryName, category_id: categoryId });
             }
           }
         }
@@ -332,11 +362,12 @@ export async function POST(request: NextRequest) {
         imported++;
       } catch (rowError: any) {
         console.error(`Error row ${i}:`, rowError);
-        errors.push(`Ligne ${i + 1}: ${rowError.message}`);
       }
     }
 
     await connection.query('UPDATE import_batches SET record_count = ? WHERE id = ?', [imported, batchId]);
+
+    console.log('Import complete:', { imported, skipped, newCategories, newSubcategories });
 
     return NextResponse.json({ 
       success: true, 
@@ -344,7 +375,6 @@ export async function POST(request: NextRequest) {
       skipped, 
       newCategories, 
       newSubcategories, 
-      errors: errors.slice(0, 10), 
       batchId 
     });
   } catch (error) {
