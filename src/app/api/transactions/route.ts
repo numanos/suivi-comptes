@@ -159,12 +159,10 @@ function fixEncoding(str: string): string {
 
 async function transactionExists(date: string, libelle: string, amount: number): Promise<boolean> {
   const trimmedLibelle = libelle.trim();
-  console.log('Checking duplicate:', { date, libelle: trimmedLibelle, amount });
   const result = await query(
-    'SELECT id FROM transactions WHERE date = ? AND libelle = ? AND amount = ? LIMIT 1',
+    'SELECT id FROM transactions WHERE date = ? AND TRIM(libelle) = ? AND amount = ? LIMIT 1',
     [date, trimmedLibelle, amount]
   ) as any[];
-  console.log('Duplicate check result:', result.length > 0);
   return result.length > 0;
 }
 
@@ -291,7 +289,13 @@ export async function POST(request: NextRequest) {
     let newCategories = 0;
     let newSubcategories = 0;
 
+    console.log('Starting import of', data.length, 'rows');
+
     for (let i = 0; i < data.length; i++) {
+      if (i % 100 === 0) {
+        console.log(`Progress: ${i}/${data.length} rows`);
+      }
+      
       try {
         const row = data[i];
         
@@ -395,7 +399,7 @@ export async function POST(request: NextRequest) {
         await connection.query(
           `INSERT INTO transactions (date, libelle, note, amount, category_id, subcategory_id, balance, import_batch_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [date, finalLibelle, note || null, amount, categoryId, subcategoryId || null, balance, batchId]
+          [date, finalLibelle.trim(), note || null, amount, categoryId, subcategoryId || null, balance, batchId]
         );
         imported++;
       } catch (rowError: any) {
