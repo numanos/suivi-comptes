@@ -98,12 +98,34 @@ function guessTheme(categoryName: string): number {
 }
 
 async function transactionExists(date: string, libelle: string, amount: number): Promise<boolean> {
-  if (!libelle) return false;
+  if (!libelle || !date) return false;
   const existing = await query(
     'SELECT id FROM transactions WHERE date = ? AND LOWER(libelle) = LOWER(?) AND amount = ? LIMIT 1',
     [date, libelle.substring(0, 255), amount]
   ) as any[];
   return existing.length > 0;
+}
+
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ';' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  
+  return result;
 }
 
 export async function POST(request: NextRequest) {
@@ -119,51 +141,73 @@ export async function POST(request: NextRequest) {
 
     let text = await file.text();
     
-    // Handle different encodings
+    // Normalize line endings
     text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
-    // Try to detect and fix encoding
+    // Convert from ISO-8859-1 to UTF-8 if needed
     try {
-      text = new TextDecoder('utf-8', { fatal: false }).decode(new TextEncoder().encode(text));
-    } catch (e) {
-      // Keep original if UTF-8 decode fails
-    }
-    
-    // Try with ; first, then ,
-    let result = Papa.parse(text, {
-      header: true,
-      delimiter: ';',
-      skipEmptyLines: true,
-      transformHeader: (header: string) => header.trim().toLowerCase()
-    });
-
-    // If no data, try with comma
-    if (result.data.length === 0 || !result.data[0] || Object.keys(result.data[0]).length < 3) {
-      result = Papa.parse(text, {
-        header: true,
-        delimiter: ',',
-        skipEmptyLines: true,
-        transformHeader: (header: string) => header.trim().toLowerCase()
+      text = text.replace(/[\x80-\xff]/g, (c) => {
+        const code = c.charCodeAt(0);
+        // Simple conversion for common characters
+        const isoToUtf8: Record<number, string> = {
+          0xe9: 'é', 0xe8: 'è', 0xe0: 'à', 0xe2: 'â', 0xe4: 'ä',
+          0xf9: 'ù', 0xfb: 'û', 0xfc: 'ü',
+          0xf4: 'ô', 0xf6: 'ö',
+          0xe7: 'ç',
+          0xe4: 'ä', 0xf6: 'ö', 0xfc: 'ü',
+          0xc9: 'É', 0xc8: 'È', 0xc0: 'À', 0xc2: 'Â'
+        };
+        return isoToUtf8[code] || c;
       });
-    }
-
-    if (result.errors.length > 0) {
-      console.log('Parse errors:', result.errors);
-    }
-
-    const data = result.data as any[];
-    console.log('Parsed rows:', data.length);
-    if (data.length > 0) {
-      console.log('First row keys:', Object.keys(data[0]));
-      console.log('First row sample:', JSON.stringify(data[0]));
+    } catch (e) {
+      // Keep original
     }
     
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    if (lines.length < 2) {
+      return NextResponse.json({ error: 'Fichier CSV invalide ou vide' }, { status: 400 });
+    }
+    
+    // Parse header to find column indices
+    const headerLine = lines[0];
+    const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().trim());
+    
+    // Find column indices
+    const dateIdx = headers.findIndex(h => h.includes('date'));
+    const libelleIdx = headers.findIndex(h => h.includes('libell'));
+    const noteIdx = headers.findIndex(h => h.includes('note'));
+    const montantIdx = headers.findIndex(h => h.includes('montant'));
+    const categorieIdx = headers.findIndex(h => h.includes('catégor') || h.includes('categor'));
+    const sousCatIdx = headers.findIndex(h => h.includes('sous'));
+    const soldeIdx = headers.findIndex(h => h.includes('solde'));
+    
+    console.log('Header indices:', { dateIdx, libelleIdx, noteIdx, montantIdx, categorieIdx, sousCatIdx, soldeIdx });
+    console.log('Headers:', headers);
+    
+    // Parse data lines
+    const data: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]);
+      if (values.length >= 2) {
+        data.push(values);
+      }
+    }
+    
+    console.log('Parsed data rows:', data.length);
+    if (data.length > 0) {
+      console.log('First data row:', data[0]);
+      console.log('Row 2:', data[1]);
+    }
+    
+    // Create import batch
     const [batchResult] = await connection.query(
       'INSERT INTO import_batches (filename, record_count) VALUES (?, ?)',
       [file.name, data.length]
     );
     const batchId = (batchResult as any).insertId;
 
+    // Get existing categories
     const [categories] = await connection.query(`
       SELECT c.id, c.name, c.theme_id, GROUP_CONCAT(s.name) as subcategory_names
       FROM categories c
@@ -189,32 +233,31 @@ export async function POST(request: NextRequest) {
     const errors: string[] = [];
 
     for (let i = 0; i < data.length; i++) {
-      const row = data[i];
       try {
-        // Map the columns (headers are now lowercase)
-        const dateStr = row['date'] || '';
-        const libelle = row['libellé'] || row['libelle'] || '';
-        const note = row['note personnelle'] || row['note'] || '';
-        const amountStr = row['montant'] || '0';
-        const categoryName = row['catégorie'] || row['categorie'] || '';
-        const subcategoryName = row['sous-catégorie'] || row['sous categorie'] || '';
-        const balanceStr = row['solde'] || '0';
+        const row = data[i];
+        
+        // Get values by index
+        const dateStr = dateIdx >= 0 && dateIdx < row.length ? row[dateIdx] : '';
+        const libelle = libelleIdx >= 0 && libelleIdx < row.length ? row[libelleIdx] : '';
+        const note = noteIdx >= 0 && noteIdx < row.length ? row[noteIdx] : '';
+        const amountStr = montantIdx >= 0 && montantIdx < row.length ? row[montantIdx] : '0';
+        const categoryName = categorieIdx >= 0 && categorieIdx < row.length ? row[categorieIdx] : '';
+        const subcategoryName = sousCatIdx >= 0 && sousCatIdx < row.length ? row[sousCatIdx] : '';
+        const balanceStr = soldeIdx >= 0 && soldeIdx < row.length ? row[soldeIdx] : '0';
 
-        console.log(`Row ${i}:`, { dateStr, libelle, categoryName });
+        console.log(`Row ${i}: date=${dateStr}, libelle=${libelle.substring(0,30)}, cat=${categoryName}`);
 
         // Parse date (format: DD/MM/YYYY)
-        const dateParts = dateStr?.split('/');
+        const dateParts = dateStr.split('/');
         let date = null;
-        if (dateParts && dateParts.length === 3) {
+        if (dateParts.length === 3) {
           date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
         }
 
         if (!date) {
-          console.log(`Skipping row ${i}: no date`);
+          console.log(`Skipping row ${i}: no valid date`);
           continue;
         }
-
-        // Use category as libelle if empty
 
         // Parse amount
         let amount = 0;
@@ -222,7 +265,7 @@ export async function POST(request: NextRequest) {
         amount = parseFloat(amountClean);
 
         // Parse balance
-        let balance = null;
+        let balance: number | null = null;
         const balanceClean = balanceStr.replace(' ', '').replace(',', '.');
         if (balanceClean) {
           balance = parseFloat(balanceClean);
