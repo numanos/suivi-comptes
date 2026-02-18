@@ -338,8 +338,9 @@ export default function BudgetPage() {
               setFilterLibelle('');
               setFilterCategory('');
               setFilterSubcategory('');
+              setTimeout(() => fetchTransactions(), 0);
             }}>
-              Effacer
+              Effacer filtres
             </button>
           </div>
           <div className="form-group" style={{ marginBottom: 0, alignSelf: 'flex-end' }}>

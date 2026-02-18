@@ -38,14 +38,14 @@ interface SummaryData {
     Obligations: number;
     Liquidites: number;
     total: number;
-  };
+  } | null;
   evolutionPercent: {
     Action: number | null;
     Immo: number | null;
     Obligations: number | null;
     Liquidites: number | null;
     total: number | null;
-  };
+  } | null;
 }
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#64748b'];
@@ -159,17 +159,24 @@ export default function PatrimoinePage() {
               <div className="stat-label">Total {summaryData.year}</div>
               <div className="stat-value">{formatAmount(summaryData.total)}</div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">Évolution vs {summaryData.prevYear}</div>
-              <div className={`stat-value ${(summaryData.evolution.total || 0) >= 0 ? 'positive' : 'negative'}`}>
-                {formatAmount(summaryData.evolution.total)}
+            {summaryData.evolution ? (
+              <div className="stat-card">
+                <div className="stat-label">Évolution vs {summaryData.prevYear}</div>
+                <div className={`stat-value ${(summaryData.evolution.total || 0) >= 0 ? 'positive' : 'negative'}`}>
+                  {formatAmount(summaryData.evolution.total)}
+                </div>
+                {summaryData.evolutionPercent && summaryData.evolutionPercent.total !== null && (
+                  <span className={`badge ${summaryData.evolutionPercent.total >= 0 ? 'badge-success' : 'badge-danger'}`}>
+                    {formatPercent(summaryData.evolutionPercent.total)}
+                  </span>
+                )}
               </div>
-              {summaryData.evolutionPercent.total !== null && (
-                <span className={`badge ${summaryData.evolutionPercent.total >= 0 ? 'badge-success' : 'badge-danger'}`}>
-                  {formatPercent(summaryData.evolutionPercent.total)}
-                </span>
-              )}
-            </div>
+            ) : (
+              <div className="stat-card">
+                <div className="stat-label">Évolution vs {summaryData.prevYear}</div>
+                <div className="stat-value" style={{ color: 'var(--text-light)' }}>-</div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -219,8 +226,8 @@ export default function PatrimoinePage() {
                   const typeKey = type as keyof typeof summaryData.totals;
                   const current = summaryData.totals[typeKey] || 0;
                   const prev = summaryData.prevTotals[typeKey] || 0;
-                  const evol = summaryData.evolution[typeKey] || 0;
-                  const evolPercent = summaryData.evolutionPercent[typeKey];
+                  const evol = summaryData.evolution ? summaryData.evolution[typeKey] : null;
+                  const evolPercent = summaryData.evolutionPercent ? summaryData.evolutionPercent[typeKey] : null;
                   
                   return (
                     <tr key={type}>
@@ -233,9 +240,11 @@ export default function PatrimoinePage() {
                       <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatAmount(current)}</td>
                       <td style={{ textAlign: 'right' }}>{formatAmount(prev)}</td>
                       <td style={{ textAlign: 'right' }}>
-                        <span className={evol >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                          {evol >= 0 ? '+' : ''}{formatAmount(evol)}
-                        </span>
+                        {evol !== null ? (
+                          <span className={evol >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                            {evol >= 0 ? '+' : ''}{formatAmount(evol)}
+                          </span>
+                        ) : '-'}
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         {evolPercent !== null ? (
@@ -252,12 +261,14 @@ export default function PatrimoinePage() {
                   <td style={{ textAlign: 'right' }}>{formatAmount(summaryData.total)}</td>
                   <td style={{ textAlign: 'right' }}>{formatAmount(summaryData.prevTotal)}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <span className={summaryData.evolution.total >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                      {summaryData.evolution.total >= 0 ? '+' : ''}{formatAmount(summaryData.evolution.total)}
-                    </span>
+                    {summaryData.evolution ? (
+                      <span className={summaryData.evolution.total >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                        {summaryData.evolution.total >= 0 ? '+' : ''}{formatAmount(summaryData.evolution.total)}
+                      </span>
+                    ) : '-'}
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    {summaryData.evolutionPercent.total !== null ? (
+                    {summaryData.evolutionPercent && summaryData.evolutionPercent.total !== null ? (
                       <span className={summaryData.evolutionPercent.total >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
                         {formatPercent(summaryData.evolutionPercent.total)}
                       </span>

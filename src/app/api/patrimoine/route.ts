@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         };
 
         for (const row of rows) {
-          totals[row.type] = row.total || 0;
+          totals[row.type] = Number(row.total) || 0;
         }
 
         const total = Object.values(totals).reduce((a: number, b: number) => a + b, 0);
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
           WHERE p.year = ?
         `, [yr - 1]) as any[];
 
-        const prevTotal = prevYearRows[0]?.total || 0;
+        const prevTotal = Number(prevYearRows[0]?.total) || 0;
         const evolutionVal = total - prevTotal;
         const evolutionPercent = prevTotal > 0 ? (evolutionVal / prevTotal) * 100 : null;
 
@@ -159,20 +159,20 @@ export async function GET(request: NextRequest) {
         total,
         prevTotals,
         prevTotal,
-        evolution: {
+        evolution: hasDataForYear ? {
           Action: totals['Action'] - prevTotals['Action'],
           Immo: totals['Immo'] - prevTotals['Immo'],
           Obligations: totals['Obligations'] - prevTotals['Obligations'],
           Liquidites: totals['Liquidites'] - prevTotals['Liquidites'],
           total: total - prevTotal
-        },
-        evolutionPercent: {
+        } : null,
+        evolutionPercent: hasDataForYear ? {
           Action: prevTotals['Action'] > 0 ? ((totals['Action'] - prevTotals['Action']) / prevTotals['Action']) * 100 : null,
           Immo: prevTotals['Immo'] > 0 ? ((totals['Immo'] - prevTotals['Immo']) / prevTotals['Immo']) * 100 : null,
           Obligations: prevTotals['Obligations'] > 0 ? ((totals['Obligations'] - prevTotals['Obligations']) / prevTotals['Obligations']) * 100 : null,
           Liquidites: prevTotals['Liquidites'] > 0 ? ((totals['Liquidites'] - prevTotals['Liquidites']) / prevTotals['Liquidites']) * 100 : null,
           total: prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null
-        }
+        } : null
       };
 
       return NextResponse.json(summary);
