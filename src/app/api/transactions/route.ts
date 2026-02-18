@@ -100,7 +100,7 @@ function guessTheme(categoryName: string): number {
 async function transactionExists(date: string, libelle: string, amount: number): Promise<boolean> {
   if (!libelle) return false;
   const existing = await query(
-    'SELECT id FROM transactions WHERE date = ? AND libelle = ? AND amount = ? LIMIT 1',
+    'SELECT id FROM transactions WHERE date = ? AND LOWER(libelle) = LOWER(?) AND amount = ? LIMIT 1',
     [date, libelle.substring(0, 255), amount]
   ) as any[];
   return existing.length > 0;
