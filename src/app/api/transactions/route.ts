@@ -7,6 +7,8 @@ export async function GET(request: NextRequest) {
     const year = searchParams.get('year');
     const month = searchParams.get('month');
     const categoryId = searchParams.get('category');
+    const subcategoryId = searchParams.get('subcategory');
+    const libelle = searchParams.get('libelle');
     const limit = searchParams.get('limit') || '100';
     const offset = searchParams.get('offset') || '0';
 
@@ -35,6 +37,16 @@ export async function GET(request: NextRequest) {
     if (categoryId) {
       sql += ' AND t.category_id = ?';
       params.push(parseInt(categoryId));
+    }
+
+    if (subcategoryId) {
+      sql += ' AND t.subcategory_id = ?';
+      params.push(parseInt(subcategoryId));
+    }
+
+    if (libelle) {
+      sql += ' AND t.libelle LIKE ?';
+      params.push(`%${libelle}%`);
     }
 
     sql += ' ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?';

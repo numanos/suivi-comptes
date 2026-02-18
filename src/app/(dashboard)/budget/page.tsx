@@ -36,6 +36,9 @@ export default function BudgetPage() {
   const [importResult, setImportResult] = useState<any>(null);
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState('');
+  const [filterLibelle, setFilterLibelle] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterSubcategory, setFilterSubcategory] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -53,6 +56,9 @@ export default function BudgetPage() {
       const params = new URLSearchParams();
       if (year) params.set('year', year);
       if (month) params.set('month', month);
+      if (filterLibelle) params.set('libelle', filterLibelle);
+      if (filterCategory) params.set('category', filterCategory);
+      if (filterSubcategory) params.set('subcategory', filterSubcategory);
       
       const res = await fetch(`/api/transactions?${params}`);
       const data = await res.json();
@@ -295,6 +301,35 @@ export default function BudgetPage() {
               <option value="">Tous</option>
               {['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'].map((m, i) => (
                 <option key={i + 1} value={i + 1}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Libellé</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Rechercher..."
+              value={filterLibelle}
+              onChange={(e) => setFilterLibelle(e.target.value)}
+              style={{ width: '150px' }}
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Catégorie</label>
+            <select className="form-select" value={filterCategory} onChange={(e) => { setFilterCategory(e.target.value); setFilterSubcategory(''); }}>
+              <option value="">Toutes</option>
+              {themes.flatMap(t => t.categories).map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Sous-catégorie</label>
+            <select className="form-select" value={filterSubcategory} onChange={(e) => setFilterSubcategory(e.target.value)} disabled={!filterCategory}>
+              <option value="">Toutes</option>
+              {filterCategory && themes.flatMap(t => t.categories).find(c => c.id === Number(filterCategory))?.subcategories.map(sub => (
+                <option key={sub.id} value={sub.id}>{sub.name}</option>
               ))}
             </select>
           </div>
