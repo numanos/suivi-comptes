@@ -292,10 +292,23 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // If user skipped duplicates, filter them out
-    const rowsToImport = skipDuplicates 
-      ? parsedRows.filter(r => !duplicatesInFile.some(d => d.rowIndex === r.index + 2))
-      : parsedRows;
+    // If user skipped duplicates, use parsedRows (unique rows only)
+    // If user wants all rows, add back the duplicates from the file
+    console.log('skipDuplicates:', skipDuplicates, 'duplicatesInFile:', duplicatesInFile.length, 'parsedRows:', parsedRows.length);
+    
+    let rowsToImport = parsedRows;
+    if (!skipDuplicates && duplicatesInFile.length > 0) {
+      // Add back duplicate rows from the original data
+      for (const dup of duplicatesInFile) {
+        const rowIdx = dup.rowIndex - 2;
+        if (rowIdx >= 0 && rowIdx < data.length) {
+          const row = data[rowIdx];
+          rowsToImport.push({ row, date: dup.date, libelle: dup.libelle, amount: dup.amount, index: rowIdx });
+        }
+      }
+    }
+
+    console.log('rowsToImport.length:', rowsToImport.length);
 
     // Create import batch
     const [batchResult] = await connection.query(
