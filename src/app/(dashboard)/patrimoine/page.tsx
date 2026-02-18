@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 
 interface EvolutionData {
   year: number;
@@ -199,7 +199,16 @@ export default function PatrimoinePage() {
               <YAxis />
               <Tooltip formatter={(value: number) => formatAmount(value)} />
               <Legend />
-              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={{ r: 5, fill: '#000' }} activeDot={{ r: 8 }} />
+              <Line 
+                type="monotone" 
+                dataKey="Total" 
+                stroke="#000" 
+                strokeWidth={3} 
+                dot={{ r: 6, fill: '#000' }} 
+                activeDot={{ r: 8 }}
+              >
+                <LabelList dataKey="Total" position="top" formatter={(value: number) => formatAmount(value)} />
+              </Line>
               <Line type="monotone" dataKey="Actions" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 4, fill: COLORS[0] }} activeDot={{ r: 6 }} />
               <Line type="monotone" dataKey="Immobilier" stroke={COLORS[1]} strokeWidth={2} dot={{ r: 4, fill: COLORS[1] }} activeDot={{ r: 6 }} />
               <Line type="monotone" dataKey="Obligations" stroke={COLORS[2]} strokeWidth={2} dot={{ r: 4, fill: COLORS[2] }} activeDot={{ r: 6 }} />
