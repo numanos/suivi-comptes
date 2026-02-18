@@ -131,14 +131,38 @@ function guessTheme(categoryName: string): number {
   return 2;
 }
 
+function fixEncoding(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/\xe9/g, 'é')
+    .replace(/\xe8/g, 'è')
+    .replace(/\xe0/g, 'à')
+    .replace(/\xe2/g, 'â')
+    .replace(/\xe4/g, 'ä')
+    .replace(/\xf9/g, 'ù')
+    .replace(/\xfb/g, 'û')
+    .replace(/\xfc/g, 'ü')
+    .replace(/\xf4/g, 'ô')
+    .replace(/\xf6/g, 'ö')
+    .replace(/\xe7/g, 'ç')
+    .replace(/\xe1/g, 'á')
+    .replace(/\xe3/g, 'ã')
+    .replace(/\xed/g, 'í')
+    .replace(/\xf3/g, 'ó')
+    .replace(/\xf1/g, 'ñ')
+    .replace(/\xc9/g, 'É')
+    .replace(/\xc8/g, 'È')
+    .replace(/\xc0/g, 'À')
+    .replace(/\xc2/g, 'Â')
+    .replace(/\xc7/g, 'Ç');
+}
+
 async function transactionExists(date: string, libelle: string, amount: number): Promise<boolean> {
-  if (!libelle || !date) return false;
-  // Check exact match on date + libelle + amount
-  const existing = await query(
+  const result = await query(
     'SELECT id FROM transactions WHERE date = ? AND libelle = ? AND amount = ? LIMIT 1',
     [date, libelle, amount]
   ) as any[];
-  return existing.length > 0;
+  return result.length > 0;
 }
 
 function parseCSVLine(line: string): string[] {
@@ -235,9 +259,10 @@ export async function POST(request: NextRequest) {
     const categoryByNormalized = new Map<string, any>();
     
     for (const cat of categories) {
+      const fixedName = fixEncoding(cat.name);
       categoryById.set(cat.id, cat);
-      categoryByName.set(cat.name.toLowerCase(), cat);
-      categoryByNormalized.set(normalizeForMatch(cat.name), cat);
+      categoryByName.set(fixedName.toLowerCase(), cat);
+      categoryByNormalized.set(normalizeForMatch(fixedName), cat);
     }
 
     // Get subcategories
@@ -248,8 +273,9 @@ export async function POST(request: NextRequest) {
     
     const subByName = new Map<string, any>();
     for (const sub of subcategories) {
-      subByName.set(`${sub.category_id}|${sub.name.toLowerCase()}`, sub);
-      subByName.set(`${sub.category_id}|${normalizeForMatch(sub.name)}`, sub);
+      const fixedName = fixEncoding(sub.name);
+      subByName.set(`${sub.category_id}|${fixedName.toLowerCase()}`, sub);
+      subByName.set(`${sub.category_id}|${normalizeForMatch(fixedName)}`, sub);
     }
 
     console.log('Categories loaded:', categories.length);
@@ -265,12 +291,18 @@ export async function POST(request: NextRequest) {
         
         // Get values by index
         const dateStr = dateIdx >= 0 && dateIdx < row.length ? row[dateIdx] : '';
-        const libelle = libelleIdx >= 0 && libelleIdx < row.length ? row[libelleIdx] : '';
-        const note = noteIdx >= 0 && noteIdx < row.length ? row[noteIdx] : '';
+        const libelleRaw = libelleIdx >= 0 && libelleIdx < row.length ? row[libelleIdx] : '';
+        const noteRaw = noteIdx >= 0 && noteIdx < row.length ? row[noteIdx] : '';
         const amountStr = montantIdx >= 0 && montantIdx < row.length ? row[montantIdx] : '0';
-        const categoryName = categorieIdx >= 0 && categorieIdx < row.length ? row[categorieIdx] : '';
-        const subcategoryName = sousCatIdx >= 0 && sousCatIdx < row.length ? row[sousCatIdx] : '';
+        const categoryNameRaw = categorieIdx >= 0 && categorieIdx < row.length ? row[categorieIdx] : '';
+        const subcategoryNameRaw = sousCatIdx >= 0 && sousCatIdx < row.length ? row[sousCatIdx] : '';
         const balanceStr = soldeIdx >= 0 && soldeIdx < row.length ? row[soldeIdx] : '0';
+
+        // Fix encoding on all text fields
+        const libelle = fixEncoding(libelleRaw);
+        const note = fixEncoding(noteRaw);
+        const categoryName = fixEncoding(categoryNameRaw);
+        const subcategoryName = fixEncoding(subcategoryNameRaw);
 
         // Parse date (format: DD/MM/YYYY)
         const dateParts = dateStr.split('/');
