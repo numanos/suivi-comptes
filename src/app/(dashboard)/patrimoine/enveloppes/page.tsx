@@ -27,7 +27,9 @@ export default function EnveloppesPage() {
   const [showAddEnvelope, setShowAddEnvelope] = useState(false);
   const [showAddPlacement, setShowAddPlacement] = useState(false);
   const [showEditEnvelope, setShowEditEnvelope] = useState(false);
+  const [showEditPlacement, setShowEditPlacement] = useState(false);
   const [editingEnvelope, setEditingEnvelope] = useState<Envelope | null>(null);
+  const [editingPlacement, setEditingPlacement] = useState<Placement | null>(null);
   const [selectedEnvelopeId, setSelectedEnvelopeId] = useState<number | null>(null);
   
   const [newEnvelopeName, setNewEnvelopeName] = useState('');
@@ -37,6 +39,10 @@ export default function EnveloppesPage() {
   const [newPlacementName, setNewPlacementName] = useState('');
   const [newPlacementType, setNewPlacementType] = useState('Action');
   const [newPlacementValorization, setNewPlacementValorization] = useState('');
+  
+  const [editPlacementName, setEditPlacementName] = useState('');
+  const [editPlacementType, setEditPlacementType] = useState('Action');
+  const [editPlacementValorization, setEditPlacementValorization] = useState('');
 
   useEffect(() => {
     fetchEnvelopes();
@@ -151,6 +157,38 @@ export default function EnveloppesPage() {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const handleEditPlacement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlacement) return;
+
+    try {
+      await fetch('/api/patrimoine/placements', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingPlacement.id,
+          name: editPlacementName,
+          type_placement: editPlacementType,
+          year: editingPlacement.year,
+          valorization: parseFloat(editPlacementValorization) || 0
+        })
+      });
+      setShowEditPlacement(false);
+      setEditingPlacement(null);
+      fetchEnvelopes();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const openEditPlacement = (placement: Placement) => {
+    setEditingPlacement(placement);
+    setEditPlacementName(placement.name);
+    setEditPlacementType(placement.type_placement);
+    setEditPlacementValorization(placement.valorization?.toString() || '');
+    setShowEditPlacement(true);
   };
 
   const formatAmount = (amount: number) => {
@@ -302,6 +340,51 @@ export default function EnveloppesPage() {
         </div>
       )}
 
+      {showEditPlacement && editingPlacement && (
+        <div className="modal-overlay" onClick={() => setShowEditPlacement(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Modifier le placement</h3>
+              <button className="modal-close" onClick={() => setShowEditPlacement(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleEditPlacement}>
+              <div className="form-group">
+                <label className="form-label">Nom du placement</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editPlacementName}
+                  onChange={(e) => setEditPlacementName(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Type de placement</label>
+                <select
+                  className="form-select"
+                  value={editPlacementType}
+                  onChange={(e) => setEditPlacementType(e.target.value)}
+                >
+                  {TYPES.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Valorisation {editingPlacement.year}</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={editPlacementValorization}
+                  onChange={(e) => setEditPlacementValorization(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary">Enregistrer</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div>Chargement...</div>
       ) : envelopes.length === 0 ? (
@@ -374,7 +457,7 @@ export default function EnveloppesPage() {
                             <th>Produit</th>
                             <th>Type</th>
                             <th style={{ textAlign: 'right' }}>Valorisation</th>
-                            <th style={{ width: '80px' }}></th>
+                            <th style={{ width: '100px' }}></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -384,13 +467,22 @@ export default function EnveloppesPage() {
                               <td><span className={`badge ${getTypeColor(p.type_placement)}`}>{p.type_placement}</span></td>
                               <td style={{ textAlign: 'right' }}>{formatAmount(p.valorization)}</td>
                               <td>
-                                <button
-                                  className="btn btn-danger"
-                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                                  onClick={() => handleDeletePlacement(p.id)}
-                                >
-                                  ×
-                                </button>
+                                <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                  <button
+                                    className="btn btn-secondary"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                    onClick={() => openEditPlacement(p)}
+                                  >
+                                    Éditer
+                                  </button>
+                                  <button
+                                    className="btn btn-danger"
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                    onClick={() => handleDeletePlacement(p.id)}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}
