@@ -198,7 +198,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Fichier requis' }, { status: 400 });
     }
 
-    let text = await file.text();
+    // Read as ArrayBuffer and decode as ISO-8859-1
+    const buffer = await file.arrayBuffer();
+    const decoder = new TextDecoder('iso-8859-1');
+    let text = decoder.decode(buffer);
     
     // Normalize line endings
     text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
