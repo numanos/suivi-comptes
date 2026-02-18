@@ -1,14 +1,48 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+
+interface Transaction {
+  id: number;
+  date: string;
+  libelle: string;
+  note: string | null;
+  amount: number;
+  category_id: number | null;
+  category_name: string | null;
+  subcategory_id: number | null;
+  subcategory_name: string | null;
+  balance: number | null;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  theme_id: number;
+  subcategories: { id: number; name: string }[];
+}
+
+interface Theme {
+  id: number;
+  name: string;
+  categories: Category[];
+}
 
 export default function BudgetPage() {
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [themes, setThemes] = useState<Theme[]>([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [month, setMonth] = useState('');
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [editLibelle, setEditLibelle] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState<number | null>(null);
+  const [editSubcategoryId, setEditSubcategoryId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchTransactions = async () => {
@@ -27,6 +61,21 @@ export default function BudgetPage() {
       setLoading(false);
     }
   };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch('/api/categories');
+      const data = await res.json();
+      setThemes(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+    fetchCategories();
+  }, []);
 
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +108,75 @@ export default function BudgetPage() {
     }
   };
 
+  const handleEdit = (t: Transaction) => {
+    setEditingTransaction(t);
+    setEditLibelle(t.libelle);
+    setEditNote(t.note || '');
+    setEditCategoryId(t.category_id);
+    setEditSubcategoryId(t.subcategory_id);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTransaction) return;
+
+    try {
+      await fetch('/api/transactions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingTransaction.id,
+          libelle: editLibelle,
+          note: editNote,
+          category_id: editCategoryId,
+          subcategory_id: editSubcategoryId
+        })
+      });
+      setShowEditModal(false);
+      fetchTransactions();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Supprimer cette transaction ?')) return;
+    
+    try {
+      await fetch(`/api/transactions?id=${id}`, { method: 'DELETE' });
+      fetchTransactions();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!confirm(`Supprimer ${selectedIds.length} transactions ?`)) return;
+    
+    try {
+      await fetch(`/api/transactions?ids=${selectedIds.join(',')}`, { method: 'DELETE' });
+      setSelectedIds([]);
+      fetchTransactions();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === transactions.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(transactions.map(t => t.id));
+    }
+  };
+
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
   };
@@ -66,6 +184,10 @@ export default function BudgetPage() {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('fr-FR');
   };
+
+  const currentSubcategories = themes
+    .flatMap(t => t.categories)
+    .find(c => c.id === editCategoryId)?.subcategories || [];
 
   return (
     <div>
@@ -100,6 +222,7 @@ export default function BudgetPage() {
             {importResult.success ? (
               <div className="badge badge-success">
                 {importResult.imported} transactions importées
+                {importResult.skipped > 0 && ` (${importResult.skipped} doublons ignorés)`}
               </div>
             ) : (
               <div className="badge badge-danger">
@@ -114,6 +237,13 @@ export default function BudgetPage() {
       <div className="card">
         <div className="card-header">
           <h2 className="card-title">Transactions</h2>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {selectedIds.length > 0 && (
+              <button className="btn btn-danger" onClick={handleBulkDelete}>
+                Supprimer ({selectedIds.length})
+              </button>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
@@ -152,24 +282,60 @@ export default function BudgetPage() {
             <table className="table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={selectedIds.length === transactions.length && transactions.length > 0}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
                   <th>Date</th>
                   <th>Libellé</th>
                   <th>Catégorie</th>
                   <th>Sous-catégorie</th>
                   <th style={{ textAlign: 'right' }}>Montant</th>
+                  <th style={{ width: '150px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {transactions.map((t) => (
                   <tr key={t.id}>
+                    <td>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.includes(t.id)}
+                        onChange={() => toggleSelect(t.id)}
+                      />
+                    </td>
                     <td>{formatDate(t.date)}</td>
-                    <td>{t.libelle}</td>
+                    <td>
+                      <div>{t.libelle}</div>
+                      {t.note && <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>{t.note}</div>}
+                    </td>
                     <td>{t.category_name || '-'}</td>
                     <td>{t.subcategory_name || '-'}</td>
                     <td style={{ textAlign: 'right' }}>
                       <span className={t.amount >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
                         {formatAmount(t.amount)}
                       </span>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          onClick={() => handleEdit(t)}
+                        >
+                          Modifier
+                        </button>
+                        <button 
+                          className="btn btn-danger" 
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                          onClick={() => handleDelete(t.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -178,6 +344,64 @@ export default function BudgetPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Modifier la transaction</h3>
+              <button className="modal-close" onClick={() => setShowEditModal(false)}>&times;</button>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Libellé</label>
+              <input
+                type="text"
+                className="form-input"
+                value={editLibelle}
+                onChange={(e) => setEditLibelle(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Note</label>
+              <input
+                type="text"
+                className="form-input"
+                value={editNote}
+                onChange={(e) => setEditNote(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Catégorie</label>
+              <select
+                className="form-select"
+                value={editCategoryId || ''}
+                onChange={(e) => { setEditCategoryId(e.target.value ? Number(e.target.value) : null); setEditSubcategoryId(null); }}
+              >
+                <option value="">Sélectionner...</option>
+                {themes.flatMap(t => t.categories).map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Sous-catégorie</label>
+              <select
+                className="form-select"
+                value={editSubcategoryId || ''}
+                onChange={(e) => setEditSubcategoryId(e.target.value ? Number(e.target.value) : null)}
+                disabled={!editCategoryId}
+              >
+                <option value="">Sélectionner...</option>
+                {currentSubcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+            </div>
+            <button className="btn btn-primary" onClick={handleSaveEdit}>Enregistrer</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
