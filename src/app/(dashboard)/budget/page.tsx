@@ -43,6 +43,8 @@ export default function BudgetPage() {
   const [editNote, setEditNote] = useState('');
   const [editCategoryId, setEditCategoryId] = useState<number | null>(null);
   const [editSubcategoryId, setEditSubcategoryId] = useState<number | null>(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchTransactions = async () => {
@@ -90,6 +92,35 @@ export default function BudgetPage() {
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('dryRun', 'true');
+
+    try {
+      const res = await fetch('/api/transactions', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+
+      if (data.dryRun && data.duplicatesCount > 0) {
+        setDuplicateInfo(data);
+        setShowDuplicateModal(true);
+        setImporting(false);
+        return;
+      }
+
+      await doImport(file, true);
+    } catch (error) {
+      setImportResult({ error: 'Erreur lors de l\'import' });
+      setImporting(false);
+    }
+  };
+
+  const doImport = async (file: File, skipDuplicates: boolean) => {
+    setImporting(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('dryRun', 'false');
+    formData.append('skipDuplicates', skipDuplicates.toString());
 
     try {
       const res = await fetch('/api/transactions', {
@@ -105,6 +136,7 @@ export default function BudgetPage() {
       setImportResult({ error: 'Erreur lors de l\'import' });
     } finally {
       setImporting(false);
+      setShowDuplicateModal(false);
     }
   };
 
@@ -399,6 +431,65 @@ export default function BudgetPage() {
               </select>
             </div>
             <button className="btn btn-primary" onClick={handleSaveEdit}>Enregistrer</button>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Confirmation Modal */}
+      {showDuplicateModal && duplicateInfo && (
+        <div className="modal-overlay" onClick={() => setShowDuplicateModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Doublons détectés</h3>
+              <button className="modal-close" onClick={() => setShowDuplicateModal(false)}>&times;</button>
+            </div>
+            <div style={{ marginBottom: '1rem' }}>
+              <p><strong>{duplicateInfo.duplicatesCount}</strong> doublon(s) détecté(s) dans le fichier CSV.</p>
+              <p>Ces transactions ont le même date + libellé + montant.</p>
+            </div>
+            <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid #ddd' }}>
+              <table className="table" style={{ fontSize: '0.8rem' }}>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Libellé</th>
+                    <th>Montant</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {duplicateInfo.duplicatesInFile?.map((d: any, i: number) => (
+                    <tr key={i}>
+                      <td>{d.date}</td>
+                      <td>{d.libelle}</td>
+                      <td>{d.amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => doImport(fileInputRef.current?.files?.[0]!, true)}
+                disabled={importing}
+              >
+                Importer en ignorant les doublons
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => doImport(fileInputRef.current?.files?.[0]!, false)}
+                disabled={importing}
+              >
+                Importer quand même (toutes les lignes)
+              </button>
+              <button 
+                className="btn btn-danger" 
+                onClick={() => setShowDuplicateModal(false)}
+                disabled={importing}
+              >
+                Annuler
+              </button>
+            </div>
           </div>
         </div>
       )}

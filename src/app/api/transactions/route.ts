@@ -194,6 +194,8 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
+    const dryRun = formData.get('dryRun') === 'true';
+    const skipDuplicates = formData.get('skipDuplicates') !== 'false';
 
     if (!file) {
       return NextResponse.json({ error: 'Fichier requis' }, { status: 400 });
@@ -243,11 +245,61 @@ export async function POST(request: NextRequest) {
     if (data.length > 0) {
       console.log('First row:', data[0]);
     }
+
+    // Parse all rows first to detect duplicates within the file
+    const parsedRows: any[] = [];
+    const duplicatesInFile: any[] = [];
+    const seenKeys = new Set<string>();
     
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      
+      const dateStr = dateIdx >= 0 && dateIdx < row.length ? row[dateIdx] : '';
+      const libelleRaw = libelleIdx >= 0 && libelleIdx < row.length ? row[libelleIdx] : '';
+      const amountStr = montantIdx >= 0 && montantIdx < row.length ? row[montantIdx] : '0';
+      
+      const libelle = fixEncoding(libelleRaw).trim();
+      const amountClean = amountStr.replace(' ', '').replace(',', '.');
+      const amount = parseFloat(amountClean);
+      
+      const dateParts = dateStr.split('/');
+      let date = null;
+      if (dateParts.length === 3) {
+        date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+      }
+      
+      if (!date) continue;
+      
+      const key = `${date}|${libelle}|${amount}`;
+      
+      if (seenKeys.has(key)) {
+        duplicatesInFile.push({ date, libelle, amount, rowIndex: i + 2 });
+      } else {
+        seenKeys.add(key);
+        parsedRows.push({ row, date, libelle, amount, index: i });
+      }
+    }
+
+    // Dry run - return duplicates info
+    if (dryRun) {
+      return NextResponse.json({ 
+        dryRun: true, 
+        totalRows: data.length,
+        duplicatesInFile: duplicatesInFile.slice(0, 50),
+        duplicatesCount: duplicatesInFile.length,
+        uniqueRows: parsedRows.length
+      });
+    }
+
+    // If user skipped duplicates, filter them out
+    const rowsToImport = skipDuplicates 
+      ? parsedRows.filter(r => !duplicatesInFile.some(d => d.rowIndex === r.index + 2))
+      : parsedRows;
+
     // Create import batch
     const [batchResult] = await connection.query(
       'INSERT INTO import_batches (filename, record_count) VALUES (?, ?)',
-      [file.name, data.length]
+      [file.name, rowsToImport.length]
     );
     const batchId = (batchResult as any).insertId;
 
@@ -289,15 +341,13 @@ export async function POST(request: NextRequest) {
     let newCategories = 0;
     let newSubcategories = 0;
 
-    console.log('Starting import of', data.length, 'rows');
+    console.log('Starting import of', rowsToImport.length, 'rows');
 
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < rowsToImport.length; i++) {
       try {
-        const row = data[i];
+        const { row, date, libelle } = rowsToImport[i];
         
         // Get values by index
-        const dateStr = dateIdx >= 0 && dateIdx < row.length ? row[dateIdx] : '';
-        const libelleRaw = libelleIdx >= 0 && libelleIdx < row.length ? row[libelleIdx] : '';
         const noteRaw = noteIdx >= 0 && noteIdx < row.length ? row[noteIdx] : '';
         const amountStr = montantIdx >= 0 && montantIdx < row.length ? row[montantIdx] : '0';
         const categoryNameRaw = categorieIdx >= 0 && categorieIdx < row.length ? row[categorieIdx] : '';
@@ -305,19 +355,9 @@ export async function POST(request: NextRequest) {
         const balanceStr = soldeIdx >= 0 && soldeIdx < row.length ? row[soldeIdx] : '0';
 
         // Fix encoding on all text fields
-        const libelle = fixEncoding(libelleRaw);
         const note = fixEncoding(noteRaw);
         const categoryName = fixEncoding(categoryNameRaw);
         const subcategoryName = fixEncoding(subcategoryNameRaw);
-
-        // Parse date (format: DD/MM/YYYY)
-        const dateParts = dateStr.split('/');
-        let date = null;
-        if (dateParts.length === 3) {
-          date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-        }
-
-        if (!date) continue;
 
         // Parse amount
         let amount = 0;
@@ -334,9 +374,9 @@ export async function POST(request: NextRequest) {
         // Use libelle or category as fallback
         const finalLibelle = libelle || categoryName || 'Transaction sans libellé';
 
-        // Check for duplicate - exact match on date + libelle + amount
-        if (await transactionExists(date, finalLibelle, amount)) {
-          console.log(`DUPLICATE: date=${date}, libelle=${finalLibelle.trim()}, amount=${amount}`);
+        // Check for duplicate in database only if not skipping duplicates
+        if (skipDuplicates && await transactionExists(date, finalLibelle, amount)) {
+          console.log(`DUPLICATE DB: date=${date}, libelle=${finalLibelle.trim()}, amount=${amount}`);
           skipped++;
           continue;
         }
@@ -414,7 +454,8 @@ export async function POST(request: NextRequest) {
       skipped, 
       newCategories, 
       newSubcategories, 
-      batchId 
+      batchId,
+      duplicatesInFile: duplicatesInFile.length
     });
   } catch (error) {
     console.error('Import error:', error);
