@@ -64,14 +64,16 @@ suivi-comptes/
 
 ```sql
 -- Tables principales
-users (id, email, name, created_at)
-themes (id, name, type, created_at)
-categories (id, name, theme_id, created_at)
+users (id, email, password_hash, name, created_at)
+themes (id, name, is_default, display_order, created_at)
+categories (id, name, theme_id, created_at, updated_at)
 subcategories (id, name, category_id, created_at)
 transactions (id, date, libelle, note, amount, category_id, subcategory_id, balance, is_pointed, tags, import_batch_id, created_at)
-import_batches (id, filename, record_count, created_at)
-envelopes (id, name, amount, category_id, year, month, created_at)
-placements (id, name, amount, type, date, created_at)
+import_batches (id, filename, record_count, imported_at)
+
+-- Tables patrimoine
+envelopes (id, name, versements, created_at)
+placements (id, envelope_id, name, type_placement, year, valorization, created_at, updated_at)
 ```
 
 ## Historique Git complet
@@ -104,6 +106,7 @@ c5698c0 Add debug logging for dryRun
 6305c05 Add debug logging for dashboard
 2a24a78 Fix: convert month/year to numbers for comparison
 03cd8ef Fix expenses calculation to exclude savings, add filters for transactions
+e60b0cb Refactor patrimoine: envelopes now have versements, placements have types, new dashboard with evolution charts
 ```
 
 ## Problèmes et corrections effectuées
@@ -152,6 +155,18 @@ c5698c0 Add debug logging for dryRun
 - Édition (libellé, note, catégorie, sous-catégorie)
 - Suppression simple et suppression en masse
 - Selection multiple avec case à cocher
+- Bouton pour réinitialiser les filtres
+
+### Gestion du patrimoine
+- **Enveloppes** : Conteneurs génériques sans type spécifique
+- **Versements** : Montant total des versements par enveloppe (cumul depuis la création)
+- **Placements** : Produits de placement avec type (Action, Immo, Obligations, Liquidités)
+- **Valorisation** : Saisie par année pour suivre l'évolution
+- **Dashboard** : 
+  - Graphique d'évolution du patrimoine total + par type (courbes)
+  - Sélecteur d'année
+  - Tableau récapitulatif par type avec évolution vs année précédente
+  - Tableau historique complet
 
 ## Fichiers clés modifiés récemment
 
@@ -174,6 +189,30 @@ Route POST : Import CSV
 - Import CSV avec fenêtre de confirmation de doublons
 - Liste des transactions avec filtres
 - Édition et suppression
+
+### `/src/app/api/patrimoine/route.ts`
+- GET type=envelopes : Liste des enveloppes avec placements pour une année
+- GET type=evolution : Historique du patrimoine par année
+- GET type=summary : Récapitulatif pour une année avec évolution vs année précédente
+- POST : Créer une enveloppe
+- PUT : Modifier une enveloppe (nom, versements)
+- DELETE : Supprimer une enveloppe
+
+### `/src/app/api/patrimoine/placements/route.ts`
+- GET : Liste des placements (avec filtres optionnels)
+- POST : Créer un placement
+- PUT : Modifier un placement
+- DELETE : Supprimer un placement
+
+### `/src/app/(dashboard)/patrimoine/page.tsx`
+- Dashboard patrimoine avec graphiques d'évolution
+- Sélecteur d'année
+- Tableau récapitulatif par type avec évolution
+
+### `/src/app/(dashboard)/patrimoine/enveloppes/page.tsx`
+- Gestion des enveloppes (CRUD)
+- Gestion des placements par enveloppe
+- Calcul automatique du gain (valorisation - versements)
 
 ## Commandes utiles
 
