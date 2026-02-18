@@ -51,6 +51,9 @@ export async function GET(request: NextRequest) {
 }
 
 async function findOrCreateCategory(categoryName: string, themeId: number): Promise<number> {
+  if (!categoryName || !categoryName.trim()) {
+    categoryName = 'Autres';
+  }
   const existing = await query(
     'SELECT id FROM categories WHERE LOWER(name) = ? AND theme_id = ?',
     [categoryName.toLowerCase(), themeId]
@@ -60,13 +63,16 @@ async function findOrCreateCategory(categoryName: string, themeId: number): Prom
   
   const result = await query(
     'INSERT INTO categories (name, theme_id) VALUES (?, ?)',
-    [categoryName, themeId]
+    [categoryName.trim(), themeId]
   ) as any;
   
   return result.insertId;
 }
 
 async function findOrCreateSubcategory(subcategoryName: string, categoryId: number): Promise<number> {
+  if (!subcategoryName || !subcategoryName.trim()) {
+    return 0;
+  }
   const existing = await query(
     'SELECT id FROM subcategories WHERE LOWER(name) = ? AND category_id = ?',
     [subcategoryName.toLowerCase(), categoryId]
@@ -76,21 +82,23 @@ async function findOrCreateSubcategory(subcategoryName: string, categoryId: numb
   
   const result = await query(
     'INSERT INTO subcategories (name, category_id) VALUES (?, ?)',
-    [subcategoryName, categoryId]
+    [subcategoryName.trim(), categoryId]
   ) as any;
   
   return result.insertId;
 }
 
 function guessTheme(categoryName: string): number {
+  if (!categoryName) return 2;
   const name = categoryName.toLowerCase();
-  if (name.includes('epargne') || name.includes('assurance') || name.includes('livret')) return 4;
+  if (name.includes('epargne') || name.includes('assurance') || name.includes('livret') || name.includes('placement')) return 4;
   if (name.includes('salaire') || name.includes('revenu') || name.includes('allocation') || name.includes('autres revenus')) return 3;
-  if (name.includes('impôt') || name.includes('taxe') || name.includes('logement') || name.includes('crédit')) return 1;
+  if (name.includes('impôt') || name.includes('taxe') || name.includes('logement') || name.includes('crédit') || name.includes('loyer')) return 1;
   return 2;
 }
 
 async function transactionExists(date: string, libelle: string, amount: number): Promise<boolean> {
+  if (!libelle) return false;
   const existing = await query(
     'SELECT id FROM transactions WHERE date = ? AND libelle = ? AND amount = ? LIMIT 1',
     [date, libelle.substring(0, 255), amount]
@@ -109,7 +117,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Fichier requis' }, { status: 400 });
     }
 
-    const text = await file.text();
+    let text = await file.text();
+    
+    // Handle different encodings and line endings
+    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
     const result = Papa.parse(text, {
       header: true,
@@ -119,10 +130,15 @@ export async function POST(request: NextRequest) {
     });
 
     if (result.errors.length > 0) {
-      return NextResponse.json({ error: 'Erreur parsing CSV', details: result.errors }, { status: 400 });
+      console.log('Parse errors:', result.errors);
     }
 
     const data = result.data as any[];
+    console.log('Parsed rows:', data.length);
+    if (data.length > 0) {
+      console.log('First row keys:', Object.keys(data[0]));
+      console.log('First row:', data[0]);
+    }
     
     const [batchResult] = await connection.query(
       'INSERT INTO import_batches (filename, record_count) VALUES (?, ?)',
@@ -157,75 +173,102 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       try {
-        const dateParts = row['Date']?.split('/');
+        // Map the columns correctly
+        const dateStr = row['Date'] || row['date'];
+        const libelle = row['Libellé'] || row['Libell\u00e9'] || row['libellé'] || row['Libelle'] || '';
+        const note = row['Note personnelle'] || row['Note'] || '';
+        const amountStr = row['Montant'] || row['montant'] || '0';
+        const categoryName = row['Catégorie'] || row['Cat\u00e9gorie'] || row['catégorie'] || '';
+        const subcategoryName = row['Sous-catégorie'] || row['Sous-cat\u00e9gorie'] || row['sous-catégorie'] || '';
+        const balanceStr = row['Solde'] || row['solde'] || '0';
+
+        console.log(`Row ${i}:`, { dateStr, libelle, categoryName, subcategoryName });
+
+        // Parse date (format: DD/MM/YYYY)
+        const dateParts = dateStr?.split('/');
         let date = null;
         if (dateParts && dateParts.length === 3) {
           date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
         }
 
-        if (!date) continue;
-
-        let amount = 0;
-        if (row['Montant']) {
-          const amountStr = row['Montant'].replace(' ', '').replace(',', '.');
-          amount = parseFloat(amountStr);
+        if (!date || !libelle) {
+          console.log(`Skipping row ${i}: no date or libelle`);
+          continue;
         }
 
-        const libelle = row['Libellé'] || '';
+        // Parse amount
+        let amount = 0;
+        const amountClean = amountStr.replace(' ', '').replace(',', '.');
+        amount = parseFloat(amountClean);
 
+        // Parse balance
+        let balance = null;
+        const balanceClean = balanceStr.replace(' ', '').replace(',', '.');
+        if (balanceClean) {
+          balance = parseFloat(balanceClean);
+        }
+
+        // Check for duplicate
         if (await transactionExists(date, libelle, amount)) {
           skipped++;
           continue;
         }
 
-        const categoryName = row['Catégorie']?.trim() || 'Autres';
-        const subcategoryName = row['Sous-catégorie']?.trim();
-        
+        // Find or create category
         let categoryId: number | null = null;
         let subcategoryId: number | null = null;
 
-        if (categoryMap.has(categoryName.toLowerCase())) {
-          const catData = categoryMap.get(categoryName.toLowerCase());
-          categoryId = catData.id;
+        if (categoryName && categoryName.trim()) {
+          const catKey = categoryName.toLowerCase().trim();
+          if (categoryMap.has(catKey)) {
+            const catData = categoryMap.get(catKey);
+            categoryId = catData.id;
+          } else {
+            const themeId = guessTheme(categoryName);
+            categoryId = await findOrCreateCategory(categoryName.trim(), themeId);
+            newCategories++;
+            categoryMap.set(catKey, { id: categoryId, themeId });
+          }
           
-          if (subcategoryName && categoryId) {
-            const subKey = subcategoryName.toLowerCase();
+          // Find or create subcategory
+          if (subcategoryName && subcategoryName.trim() && categoryId) {
+            const subKey = subcategoryName.toLowerCase().trim();
             if (categoryMap.has(subKey)) {
               const subData = categoryMap.get(subKey);
               subcategoryId = subData.categoryId;
             } else {
-              subcategoryId = await findOrCreateSubcategory(subcategoryName, categoryId);
-              newSubcategories++;
-              categoryMap.set(subKey, { categoryId, subName: subcategoryName });
+              subcategoryId = await findOrCreateSubcategory(subcategoryName.trim(), categoryId);
+              if (subcategoryId > 0) {
+                newSubcategories++;
+                categoryMap.set(subKey, { categoryId, subName: subcategoryName.trim() });
+              }
             }
-          }
-        } else {
-          const themeId = guessTheme(categoryName);
-          categoryId = await findOrCreateCategory(categoryName, themeId);
-          newCategories++;
-          categoryMap.set(categoryName.toLowerCase(), { id: categoryId, themeId });
-          
-          if (subcategoryName) {
-            subcategoryId = await findOrCreateSubcategory(subcategoryName, categoryId);
-            newSubcategories++;
-            categoryMap.set(subcategoryName.toLowerCase(), { categoryId, subName: subcategoryName });
           }
         }
 
         await connection.query(
           `INSERT INTO transactions (date, libelle, note, amount, category_id, subcategory_id, balance, import_batch_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [date, libelle, row['Note personnelle'] || null, amount, categoryId, subcategoryId, row['Solde'] ? parseFloat(row['Solde'].replace(',', '.')) : null, batchId]
+          [date, libelle, note || null, amount, categoryId, subcategoryId || null, balance, batchId]
         );
         imported++;
       } catch (rowError: any) {
+        console.error(`Error row ${i}:`, rowError);
         errors.push(`Ligne ${i + 1}: ${rowError.message}`);
       }
     }
 
     await connection.query('UPDATE import_batches SET record_count = ? WHERE id = ?', [imported, batchId]);
 
-    return NextResponse.json({ success: true, imported, skipped, newCategories, newSubcategories, errors, batchId });
+    return NextResponse.json({ 
+      success: true, 
+      imported, 
+      skipped, 
+      newCategories, 
+      newSubcategories, 
+      errors, 
+      batchId 
+    });
   } catch (error) {
     console.error('Import error:', error);
     return NextResponse.json({ error: 'Erreur serveur: ' + String(error) }, { status: 500 });
