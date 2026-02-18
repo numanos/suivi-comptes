@@ -8,14 +8,16 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
 
     if (type === 'envelopes') {
+      const targetYear = year || new Date().getFullYear();
+      
       const envelopes = await query(`
-        SELECT e.id, e.name, e.type, 
+        SELECT e.id, e.name, e.versements,
                p.id as placement_id, p.name as placement_name, 
-               p.type_placement, p.year, p.versements, p.valorization
+               p.type_placement, p.year, p.valorization
         FROM envelopes e
         LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-        ORDER BY e.type, e.name
-      `, [year || new Date().getFullYear()]) as any[];
+        ORDER BY e.name
+      `, [targetYear]) as any[];
 
       const envelopeMap = new Map();
       for (const row of envelopes) {
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest) {
           envelopeMap.set(row.id, {
             id: row.id,
             name: row.name,
-            type: row.type,
+            versements: row.versements || 0,
             placements: []
           });
         }
@@ -33,7 +35,6 @@ export async function GET(request: NextRequest) {
             name: row.placement_name,
             type_placement: row.type_placement,
             year: row.year,
-            versements: row.versements,
             valorization: row.valorization
           });
         }
@@ -54,12 +55,11 @@ export async function GET(request: NextRequest) {
         
         const rows = await query(`
           SELECT 
-            e.type,
+            p.type_placement as type,
             SUM(p.valorization) as total
-          FROM envelopes e
-          JOIN placements p ON p.envelope_id = e.id
+          FROM placements p
           WHERE p.year = ?
-          GROUP BY e.type
+          GROUP BY p.type_placement
         `, [yr]) as any[];
 
         const totals: Record<string, number> = {
@@ -100,6 +100,76 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(evolution);
     }
 
+    if (type === 'summary') {
+      const targetYear = year ? parseInt(year) : new Date().getFullYear();
+      
+      const rows = await query(`
+        SELECT 
+          p.type_placement as type,
+          SUM(p.valorization) as total
+        FROM placements p
+        WHERE p.year = ?
+        GROUP BY p.type_placement
+      `, [targetYear]) as any[];
+
+      const totals: Record<string, number> = {
+        'Action': 0,
+        'Immo': 0,
+        'Obligations': 0,
+        'Liquidités': 0
+      };
+
+      for (const row of rows) {
+        totals[row.type] = row.total || 0;
+      }
+
+      const total = Object.values(totals).reduce((a: number, b: number) => a + b, 0);
+
+      const prevYearRows = await query(`
+        SELECT p.type_placement as type, SUM(p.valorization) as total
+        FROM placements p
+        WHERE p.year = ?
+        GROUP BY p.type_placement
+      `, [targetYear - 1]) as any[];
+
+      const prevTotals: Record<string, number> = {
+        'Action': 0,
+        'Immo': 0,
+        'Obligations': 0,
+        'Liquidités': 0
+      };
+
+      for (const row of prevYearRows) {
+        prevTotals[row.type] = row.total || 0;
+      }
+
+      const prevTotal = Object.values(prevTotals).reduce((a: number, b: number) => a + b, 0);
+
+      const summary = {
+        year: targetYear,
+        totals,
+        total,
+        prevTotals,
+        prevTotal,
+        evolution: {
+          Action: totals['Action'] - prevTotals['Action'],
+          Immo: totals['Immo'] - prevTotals['Immo'],
+          Obligations: totals['Obligations'] - prevTotals['Obligations'],
+          Liquidités: totals['Liquidités'] - prevTotals['Liquidités'],
+          total: total - prevTotal
+        },
+        evolutionPercent: {
+          Action: prevTotals['Action'] > 0 ? ((totals['Action'] - prevTotals['Action']) / prevTotals['Action']) * 100 : null,
+          Immo: prevTotals['Immo'] > 0 ? ((totals['Immo'] - prevTotals['Immo']) / prevTotals['Immo']) * 100 : null,
+          Obligations: prevTotals['Obligations'] > 0 ? ((totals['Obligations'] - prevTotals['Obligations']) / prevTotals['Obligations']) * 100 : null,
+          Liquidités: prevTotals['Liquidités'] > 0 ? ((totals['Liquidités'] - prevTotals['Liquidités']) / prevTotals['Liquidités']) * 100 : null,
+          total: prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null
+        }
+      };
+
+      return NextResponse.json(summary);
+    }
+
     return NextResponse.json({ error: 'Type requis' }, { status: 400 });
   } catch (error) {
     console.error('Error fetching patrimoine:', error);
@@ -109,34 +179,61 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, type, placements } = await request.json();
+    const { name, versements } = await request.json();
 
-    if (!name || !type) {
+    if (!name) {
       return NextResponse.json(
-        { error: 'Nom et type requis' },
+        { error: 'Nom requis' },
         { status: 400 }
       );
     }
 
     const result = await query(
-      'INSERT INTO envelopes (name, type) VALUES (?, ?)',
-      [name, type]
+      'INSERT INTO envelopes (name, versements) VALUES (?, ?)',
+      [name, versements || 0]
     ) as any;
 
-    const envelopeId = result.insertId;
-
-    if (placements && placements.length > 0) {
-      for (const pl of placements) {
-        await query(
-          'INSERT INTO placements (envelope_id, name, type_placement, year, versements, valorization) VALUES (?, ?, ?, ?, ?, ?)',
-          [envelopeId, pl.name, pl.type_placement, pl.year, pl.versements || 0, pl.valorization || 0]
-        );
-      }
-    }
-
-    return NextResponse.json({ success: true, id: envelopeId });
+    return NextResponse.json({ success: true, id: result.insertId });
   } catch (error) {
     console.error('Error creating envelope:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { id, name, versements } = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID requis' }, { status: 400 });
+    }
+
+    await query(
+      'UPDATE envelopes SET name = ?, versements = ? WHERE id = ?',
+      [name || '', versements || 0, id]
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating envelope:', error);
+    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID requis' }, { status: 400 });
+    }
+
+    await query('DELETE FROM envelopes WHERE id = ?', [parseInt(id)]);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting envelope:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
   }
 }

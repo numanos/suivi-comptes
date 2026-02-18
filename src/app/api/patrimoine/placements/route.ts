@@ -32,18 +32,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { envelope_id, name, type_placement, year, versements, valorization } = await request.json();
+    const { envelope_id, name, type_placement, year, valorization } = await request.json();
 
-    if (!envelope_id || !name || !year) {
+    if (!envelope_id || !name || !type_placement || !year) {
       return NextResponse.json(
-        { error: 'Enveloppe, nom et année requis' },
+        { error: 'Enveloppe, nom, type et année requis' },
         { status: 400 }
       );
     }
 
     const result = await query(
-      'INSERT INTO placements (envelope_id, name, type_placement, year, versements, valorization) VALUES (?, ?, ?, ?, ?, ?)',
-      [envelope_id, name, type_placement || '', year, versements || 0, valorization || 0]
+      'INSERT INTO placements (envelope_id, name, type_placement, year, valorization) VALUES (?, ?, ?, ?, ?)',
+      [envelope_id, name, type_placement, year, valorization || 0]
     ) as any;
 
     return NextResponse.json({ success: true, id: result.insertId });
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, name, type_placement, year, versements, valorization } = await request.json();
+    const { id, name, type_placement, year, valorization } = await request.json();
 
     if (!id || !name) {
       return NextResponse.json(
@@ -65,8 +65,8 @@ export async function PUT(request: NextRequest) {
     }
 
     await query(
-      'UPDATE placements SET name = ?, type_placement = ?, year = ?, versements = ?, valorization = ? WHERE id = ?',
-      [name, type_placement || '', year, versements || 0, valorization || 0, id]
+      'UPDATE placements SET name = ?, type_placement = ?, year = ?, valorization = ? WHERE id = ?',
+      [name, type_placement, year, valorization || 0, id]
     );
 
     return NextResponse.json({ success: true });

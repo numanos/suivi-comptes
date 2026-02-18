@@ -8,16 +8,17 @@ interface Placement {
   name: string;
   type_placement: string;
   year: number;
-  versements: number;
   valorization: number;
 }
 
 interface Envelope {
   id: number;
   name: string;
-  type: string;
+  versements: number;
   placements: Placement[];
 }
+
+const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidités'];
 
 export default function EnveloppesPage() {
   const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
@@ -25,14 +26,16 @@ export default function EnveloppesPage() {
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [showAddEnvelope, setShowAddEnvelope] = useState(false);
   const [showAddPlacement, setShowAddPlacement] = useState(false);
+  const [showEditEnvelope, setShowEditEnvelope] = useState(false);
+  const [editingEnvelope, setEditingEnvelope] = useState<Envelope | null>(null);
   const [selectedEnvelopeId, setSelectedEnvelopeId] = useState<number | null>(null);
   
-  // Form states
   const [newEnvelopeName, setNewEnvelopeName] = useState('');
-  const [newEnvelopeType, setNewEnvelopeType] = useState('Action');
+  const [newEnvelopeVersements, setNewEnvelopeVersements] = useState('');
+  const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
+  
   const [newPlacementName, setNewPlacementName] = useState('');
-  const [newPlacementType, setNewPlacementType] = useState('');
-  const [newPlacementVersements, setNewPlacementVersements] = useState('');
+  const [newPlacementType, setNewPlacementType] = useState('Action');
   const [newPlacementValorization, setNewPlacementValorization] = useState('');
 
   useEffect(() => {
@@ -62,11 +65,45 @@ export default function EnveloppesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newEnvelopeName,
-          type: newEnvelopeType
+          versements: parseFloat(newEnvelopeVersements) || 0
         })
       });
       setNewEnvelopeName('');
+      setNewEnvelopeVersements('');
       setShowAddEnvelope(false);
+      fetchEnvelopes();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleEditEnvelope = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEnvelope) return;
+
+    try {
+      await fetch('/api/patrimoine', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingEnvelope.id,
+          name: editingEnvelope.name,
+          versements: parseFloat(editEnvelopeVersements) || 0
+        })
+      });
+      setShowEditEnvelope(false);
+      setEditingEnvelope(null);
+      fetchEnvelopes();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeleteEnvelope = async (id: number) => {
+    if (!confirm('Supprimer cette enveloppe et tous ses placements ?')) return;
+    
+    try {
+      await fetch(`/api/patrimoine?id=${id}`, { method: 'DELETE' });
       fetchEnvelopes();
     } catch (error) {
       console.error(error);
@@ -86,15 +123,24 @@ export default function EnveloppesPage() {
           name: newPlacementName,
           type_placement: newPlacementType,
           year: parseInt(year),
-          versements: parseFloat(newPlacementVersements) || 0,
           valorization: parseFloat(newPlacementValorization) || 0
         })
       });
       setNewPlacementName('');
-      setNewPlacementType('');
-      setNewPlacementVersements('');
+      setNewPlacementType('Action');
       setNewPlacementValorization('');
       setShowAddPlacement(false);
+      fetchEnvelopes();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeletePlacement = async (id: number) => {
+    if (!confirm('Supprimer ce placement ?')) return;
+    
+    try {
+      await fetch(`/api/patrimoine/placements?id=${id}`, { method: 'DELETE' });
       fetchEnvelopes();
     } catch (error) {
       console.error(error);
@@ -136,7 +182,6 @@ export default function EnveloppesPage() {
         </div>
       </div>
 
-      {/* Add Envelope Modal */}
       {showAddEnvelope && (
         <div className="modal-overlay" onClick={() => setShowAddEnvelope(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -156,17 +201,15 @@ export default function EnveloppesPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Type</label>
-                <select
-                  className="form-select"
-                  value={newEnvelopeType}
-                  onChange={(e) => setNewEnvelopeType(e.target.value)}
-                >
-                  <option value="Action">Actions</option>
-                  <option value="Immo">Immobilier</option>
-                  <option value="Obligations">Obligations</option>
-                  <option value="Liquidités">Liquidités</option>
-                </select>
+                <label className="form-label">Versements totaux</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={newEnvelopeVersements}
+                  onChange={(e) => setNewEnvelopeVersements(e.target.value)}
+                  placeholder="Montant total des versements"
+                />
               </div>
               <button type="submit" className="btn btn-primary">Créer</button>
             </form>
@@ -174,7 +217,39 @@ export default function EnveloppesPage() {
         </div>
       )}
 
-      {/* Add Placement Modal */}
+      {showEditEnvelope && editingEnvelope && (
+        <div className="modal-overlay" onClick={() => setShowEditEnvelope(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Modifier l'enveloppe</h3>
+              <button className="modal-close" onClick={() => setShowEditEnvelope(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleEditEnvelope}>
+              <div className="form-group">
+                <label className="form-label">Nom de l'enveloppe</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editingEnvelope.name}
+                  onChange={(e) => setEditingEnvelope({ ...editingEnvelope, name: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Versements totaux</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={editEnvelopeVersements}
+                  onChange={(e) => setEditEnvelopeVersements(e.target.value)}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary">Enregistrer</button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {showAddPlacement && (
         <div className="modal-overlay" onClick={() => setShowAddPlacement(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -200,25 +275,13 @@ export default function EnveloppesPage() {
                   value={newPlacementType}
                   onChange={(e) => setNewPlacementType(e.target.value)}
                 >
-                  <option value="">Sélectionner...</option>
-                  <option value="Action">Action</option>
-                  <option value="Immo">Immobilier</option>
-                  <option value="Obligations">Obligations</option>
-                  <option value="liquidité">Liquidité</option>
+                  {TYPES.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">Versements</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-input"
-                  value={newPlacementVersements}
-                  onChange={(e) => setNewPlacementVersements(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Valorisation</label>
+                <label className="form-label">Valorisation {year}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -246,58 +309,93 @@ export default function EnveloppesPage() {
         </div>
       ) : (
         <div style={{ display: 'grid', gap: '1.5rem' }}>
-          {envelopes.map((envelope) => (
-            <div key={envelope.id} className="card">
-              <div className="card-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <h2 className="card-title">{envelope.name}</h2>
-                  <span className={`badge ${getTypeColor(envelope.type)}`}>{envelope.type}</span>
+          {envelopes.map((envelope) => {
+            const totalValorization = envelope.placements.reduce((sum, p) => sum + (p.valorization || 0), 0);
+            const gain = totalValorization - envelope.versements;
+            
+            return (
+              <div key={envelope.id} className="card">
+                <div className="card-header">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h2 className="card-title">{envelope.name}</h2>
+                    <span className="badge badge-secondary">{formatAmount(envelope.versements)} versés</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setEditingEnvelope(envelope);
+                        setEditEnvelopeVersements(envelope.versements.toString());
+                        setShowEditEnvelope(true);
+                      }}
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => handleDeleteEnvelope(envelope.id)}
+                    >
+                      Supprimer
+                    </button>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => {
+                        setSelectedEnvelopeId(envelope.id);
+                        setShowAddPlacement(true);
+                      }}
+                    >
+                      + Placement
+                    </button>
+                  </div>
                 </div>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setSelectedEnvelopeId(envelope.id);
-                    setShowAddPlacement(true);
-                  }}
-                >
-                  + Placement
-                </button>
-              </div>
 
-              {envelope.placements.length === 0 ? (
-                <p style={{ color: 'var(--text-light)' }}>Aucun placement</p>
-              ) : (
-                <div className="table-container">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Produit</th>
-                        <th>Type</th>
-                        <th style={{ textAlign: 'right' }}>Versements</th>
-                        <th style={{ textAlign: 'right' }}>Valorisation</th>
-                        <th style={{ textAlign: 'right' }}>Gain</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {envelope.placements.map((p) => (
-                        <tr key={p.id}>
-                          <td>{p.name}</td>
-                          <td>{p.type_placement}</td>
-                          <td style={{ textAlign: 'right' }}>{formatAmount(p.versements)}</td>
-                          <td style={{ textAlign: 'right' }}>{formatAmount(p.valorization)}</td>
-                          <td style={{ textAlign: 'right' }}>
-                            <span className={(p.valorization - p.versements) >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                              {formatAmount(p.valorization - p.versements)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))}
+                {envelope.placements.length === 0 ? (
+                  <p style={{ color: 'var(--text-light)' }}>Aucun placement pour {year}</p>
+                ) : (
+                  <>
+                    <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+                      <span>Valorisation {year}: <strong>{formatAmount(totalValorization)}</strong></span>
+                      <span style={{ marginLeft: '1rem' }}>
+                        Gain: <span className={gain >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                          {formatAmount(gain)} ({(gain / envelope.versements * 100).toFixed(1)}%)
+                        </span>
+                      </span>
+                    </div>
+                    <div className="table-container">
+                      <table className="table">
+                        <thead>
+                          <tr>
+                            <th>Produit</th>
+                            <th>Type</th>
+                            <th style={{ textAlign: 'right' }}>Valorisation</th>
+                            <th style={{ width: '80px' }}></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {envelope.placements.map((p) => (
+                            <tr key={p.id}>
+                              <td>{p.name}</td>
+                              <td><span className={`badge ${getTypeColor(p.type_placement)}`}>{p.type_placement}</span></td>
+                              <td style={{ textAlign: 'right' }}>{formatAmount(p.valorization)}</td>
+                              <td>
+                                <button
+                                  className="btn btn-danger"
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                  onClick={() => handleDeletePlacement(p.id)}
+                                >
+                                  ×
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

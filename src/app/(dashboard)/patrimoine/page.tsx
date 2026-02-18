@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface EvolutionData {
   year: number;
@@ -14,132 +14,254 @@ interface EvolutionData {
   evolution_percent: number | null;
 }
 
+interface SummaryData {
+  year: number;
+  totals: {
+    Action: number;
+    Immo: number;
+    Obligations: number;
+    Liquidités: number;
+  };
+  total: number;
+  prevTotals: {
+    Action: number;
+    Immo: number;
+    Obligations: number;
+    Liquidités: number;
+  };
+  prevTotal: number;
+  evolution: {
+    Action: number;
+    Immo: number;
+    Obligations: number;
+    Liquidités: number;
+    total: number;
+  };
+  evolutionPercent: {
+    Action: number | null;
+    Immo: number | null;
+    Obligations: number | null;
+    Liquidités: number | null;
+    total: number | null;
+  };
+}
+
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#64748b'];
 
 export default function PatrimoinePage() {
-  const [data, setData] = useState<EvolutionData[]>([]);
+  const [evolutionData, setEvolutionData] = useState<EvolutionData[]>([]);
+  const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
+  const [year, setYear] = useState(new Date().getFullYear().toString());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/patrimoine?type=evolution')
-      .then(res => res.json())
-      .then(data => {
-        setData(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [evolutionRes, summaryRes] = await Promise.all([
+        fetch('/api/patrimoine?type=evolution'),
+        fetch(`/api/patrimoine?type=summary&year=${year}`)
+      ]);
+      
+      const evolution = await evolutionRes.json();
+      const summary = await summaryRes.json();
+      
+      setEvolutionData(evolution);
+      setSummaryData(summary);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSummary();
+  }, [year]);
+
+  const fetchSummary = async () => {
+    try {
+      const res = await fetch(`/api/patrimoine?type=summary&year=${year}`);
+      const data = await res.json();
+      setSummaryData(data);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+  };
+
+  const formatPercent = (percent: number | null | undefined) => {
+    if (percent === null || percent === undefined) return '-';
+    return `${percent >= 0 ? '+' : ''}${percent.toFixed(1)}%`;
   };
 
   if (loading) {
     return <div>Chargement...</div>;
   }
 
-  const latestData = data[0];
-  const previousData = data[1];
+  const latestData = evolutionData[0];
+  const previousData = evolutionData[1];
 
-  const pieData = latestData ? [
-    { name: 'Actions', value: latestData.actions },
-    { name: 'Immobilier', value: latestData.immo },
-    { name: 'Obligations', value: latestData.obligations },
-    { name: 'Liquidités', value: latestData.liquidites }
-  ] : [];
-
-  const barData = data.map(d => ({
+  const chartData = evolutionData.map(d => ({
     year: d.year,
+    Total: d.total,
     Actions: d.actions,
     Immobilier: d.immo,
     Obligations: d.obligations,
     Liquidités: d.liquidites
-  }));
+  })).reverse();
+
+  const TYPE_LABELS: Record<string, string> = {
+    Action: 'Actions',
+    Immo: 'Immobilier',
+    Obligations: 'Obligations',
+    Liquidités: 'Liquidités'
+  };
+
+  const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidités'];
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Patrimoine</h1>
-        <p className="page-subtitle">Évolution de votre patrimoine</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h1 className="page-title">Patrimoine</h1>
+            <p className="page-subtitle">Évolution de votre patrimoine</p>
+          </div>
+          <select className="form-select" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: 'auto' }}>
+            {[2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027].map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {/* Current year summary */}
-      {latestData && (
+      {/* Stats for selected year */}
+      {summaryData && (
         <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-label">Total {latestData.year}</div>
-            <div className="stat-value">{formatAmount(latestData.total)}</div>
+            <div className="stat-label">Total {summaryData.year}</div>
+            <div className="stat-value">{formatAmount(summaryData.total)}</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Évolution vs {latestData.year - 1}</div>
-            <div className={`stat-value ${(latestData.evolution || 0) >= 0 ? 'positive' : 'negative'}`}>
-              {latestData.evolution !== null ? formatAmount(latestData.evolution) : '-'}
+            <div className="stat-label">Évolution vs {summaryData.year - 1}</div>
+            <div className={`stat-value ${(summaryData.evolution.total || 0) >= 0 ? 'positive' : 'negative'}`}>
+              {formatAmount(summaryData.evolution.total)}
             </div>
-            {latestData.evolution_percent !== null && (
-              <span className={`badge ${latestData.evolution_percent >= 0 ? 'badge-success' : 'badge-danger'}`}>
-                {latestData.evolution_percent >= 0 ? '+' : ''}{latestData.evolution_percent.toFixed(1)}%
+            {summaryData.evolutionPercent.total !== null && (
+              <span className={`badge ${summaryData.evolutionPercent.total >= 0 ? 'badge-success' : 'badge-danger'}`}>
+                {formatPercent(summaryData.evolutionPercent.total)}
               </span>
             )}
           </div>
         </div>
       )}
 
-      {/* Charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '1.5rem' }}>
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Répartition {latestData?.year}</h2>
-          </div>
-          <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  paddingAngle={5}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value: number) => formatAmount(value)} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Evolution chart */}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Évolution du patrimoine</h2>
         </div>
-
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Évolution par catégorie</h2>
-          </div>
-          <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="year" />
-                <YAxis />
-                <Tooltip formatter={(value: number) => formatAmount(value)} />
-                <Legend />
-                <Bar dataKey="Actions" fill={COLORS[0]} />
-                <Bar dataKey="Immobilier" fill={COLORS[1]} />
-                <Bar dataKey="Obligations" fill={COLORS[2]} />
-                <Bar dataKey="Liquidités" fill={COLORS[3]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="chart-container">
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis />
+              <Tooltip formatter={(value: number) => formatAmount(value)} />
+              <Legend />
+              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={{ r: 5 }} />
+              <Line type="monotone" dataKey="Actions" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="Immobilier" stroke={COLORS[1]} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="Obligations" stroke={COLORS[2]} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="Liquidités" stroke={COLORS[3]} strokeWidth={2} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Evolution table */}
+      {/* Summary table for selected year */}
+      {summaryData && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Répartition {summaryData.year}</h2>
+          </div>
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th style={{ textAlign: 'right' }}>Montant {summaryData.year}</th>
+                  <th style={{ textAlign: 'right' }}>Montant {summaryData.year - 1}</th>
+                  <th style={{ textAlign: 'right' }}>Évolution</th>
+                  <th style={{ textAlign: 'right' }}>Évolution %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {TYPES.map((type, idx) => {
+                  const current = summaryData.totals[type] || 0;
+                  const prev = summaryData.prevTotals[type] || 0;
+                  const evol = summaryData.evolution[type] || 0;
+                  const evolPercent = summaryData.evolutionPercent[type];
+                  
+                  return (
+                    <tr key={type}>
+                      <td>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: COLORS[idx] }}></span>
+                          {TYPE_LABELS[type]}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatAmount(current)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatAmount(prev)}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span className={evol >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                          {evol >= 0 ? '+' : ''}{formatAmount(evol)}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {evolPercent !== null ? (
+                          <span className={evolPercent >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                            {formatPercent(evolPercent)}
+                          </span>
+                        ) : '-'}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr style={{ fontWeight: 'bold', backgroundColor: 'var(--bg-secondary)' }}>
+                  <td>Total</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(summaryData.total)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(summaryData.prevTotal)}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <span className={summaryData.evolution.total >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                      {summaryData.evolution.total >= 0 ? '+' : ''}{formatAmount(summaryData.evolution.total)}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {summaryData.evolutionPercent.total !== null ? (
+                      <span className={summaryData.evolutionPercent.total >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                        {formatPercent(summaryData.evolutionPercent.total)}
+                      </span>
+                    ) : '-'}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Full evolution table */}
       <div className="card">
         <div className="card-header">
-          <h2 className="card-title">Tableau d'évolution</h2>
+          <h2 className="card-title">Historique complet</h2>
         </div>
         <div className="table-container">
           <table className="table">
@@ -155,7 +277,7 @@ export default function PatrimoinePage() {
               </tr>
             </thead>
             <tbody>
-              {data.map((d) => (
+              {evolutionData.map((d) => (
                 <tr key={d.year}>
                   <td>{d.year}</td>
                   <td style={{ textAlign: 'right' }}>{formatAmount(d.actions)}</td>
@@ -166,7 +288,7 @@ export default function PatrimoinePage() {
                   <td style={{ textAlign: 'right' }}>
                     {d.evolution !== null ? (
                       <span className={d.evolution >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                        {d.evolution >= 0 ? '+' : ''}{d.evolution_percent?.toFixed(1)}%
+                        {formatPercent(d.evolution_percent)}
                       </span>
                     ) : '-'}
                   </td>

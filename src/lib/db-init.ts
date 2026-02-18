@@ -80,7 +80,7 @@ CREATE INDEX idx_transactions_month ON transactions(date);
 CREATE TABLE IF NOT EXISTS envelopes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  type ENUM('Action', 'Immo', 'Obligations', 'Liquidités') NOT NULL,
+  versements DECIMAL(12,2) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -89,9 +89,8 @@ CREATE TABLE IF NOT EXISTS placements (
   id INT AUTO_INCREMENT PRIMARY KEY,
   envelope_id INT NOT NULL,
   name VARCHAR(255) NOT NULL,
-  type_placement VARCHAR(255) NOT NULL,
+  type_placement ENUM('Action', 'Immo', 'Obligations', 'Liquidités') NOT NULL,
   year INT NOT NULL,
-  versements DECIMAL(12,2) DEFAULT 0,
   valorization DECIMAL(12,2) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -99,6 +98,7 @@ CREATE TABLE IF NOT EXISTS placements (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE INDEX idx_placements_year ON placements(year);
+CREATE INDEX idx_placements_envelope ON placements(envelope_id, year);
 `;
 
 async function initDatabase() {
