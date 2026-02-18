@@ -12,6 +12,7 @@ interface Theme {
 interface Category {
   id: number;
   name: string;
+  theme_id: number;
   subcategories: Subcategory[];
 }
 
@@ -25,10 +26,19 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [showAddTheme, setShowAddTheme] = useState(false);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showEditCategory, setShowEditCategory] = useState(false);
+  const [showAddSubcategory, setShowAddSubcategory] = useState(false);
   const [selectedThemeId, setSelectedThemeId] = useState<number | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  
+  // Form states
   const [newThemeName, setNewThemeName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newSubcategories, setNewSubcategories] = useState('');
+  const [editCategoryName, setEditCategoryName] = useState('');
+  const [editThemeId, setEditThemeId] = useState<number | null>(null);
+  const [newSubName, setNewSubName] = useState('');
 
   useEffect(() => {
     fetchCategories();
@@ -47,10 +57,10 @@ export default function CategoriesPage() {
     }
   };
 
+  // Theme handlers
   const handleAddTheme = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newThemeName.trim()) return;
-
     try {
       await fetch('/api/themes', {
         method: 'POST',
@@ -65,21 +75,26 @@ export default function CategoriesPage() {
     }
   };
 
+  const handleDeleteTheme = async (id: number) => {
+    if (!confirm('Supprimer ce thème et toutes ses catégories ?')) return;
+    try {
+      await fetch(`/api/themes?id=${id}`, { method: 'DELETE' });
+      fetchCategories();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Category handlers
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryName.trim() || !selectedThemeId) return;
-
     const subcategories = newSubcategories.split(',').map(s => s.trim()).filter(s => s);
-
     try {
       await fetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newCategoryName,
-          theme_id: selectedThemeId,
-          subcategories
-        })
+        body: JSON.stringify({ name: newCategoryName, theme_id: selectedThemeId, subcategories })
       });
       setNewCategoryName('');
       setNewSubcategories('');
@@ -90,19 +105,67 @@ export default function CategoriesPage() {
     }
   };
 
-  const handleDeleteTheme = async (id: number) => {
-    if (!confirm('Supprimer ce thème ?')) return;
+  const handleEditCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory || !editCategoryName.trim() || !editThemeId) return;
     try {
-      await fetch(`/api/themes?id=${id}`, { method: 'DELETE' });
+      await fetch('/api/categories', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: editingCategory.id, 
+          name: editCategoryName,
+          theme_id: editThemeId
+        })
+      });
+      setShowEditCategory(false);
+      setEditingCategory(null);
       fetchCategories();
     } catch (error) {
       console.error(error);
     }
   };
 
-  if (loading) {
-    return <div>Chargement...</div>;
-  }
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm('Supprimer cette catégorie ?')) return;
+    try {
+      await fetch(`/api/categories?id=${id}`, { method: 'DELETE' });
+      fetchCategories();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Subcategory handlers
+  const handleAddSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubName.trim() || !selectedCategoryId) return;
+    try {
+      await fetch('/api/categories/sub', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newSubName, category_id: selectedCategoryId })
+      });
+      setNewSubName('');
+      setShowAddSubcategory(false);
+      setSelectedCategoryId(null);
+      fetchCategories();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeleteSubcategory = async (id: number) => {
+    if (!confirm('Supprimer cette sous-catégorie ?')) return;
+    try {
+      await fetch(`/api/categories/sub?id=${id}`, { method: 'DELETE' });
+      fetchCategories();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  if (loading) return <div>Chargement...</div>;
 
   return (
     <div>
@@ -129,13 +192,8 @@ export default function CategoriesPage() {
             <form onSubmit={handleAddTheme}>
               <div className="form-group">
                 <label className="form-label">Nom du thème</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={newThemeName}
-                  onChange={(e) => setNewThemeName(e.target.value)}
-                  placeholder="Ex: Dépenses exceptionnelles"
-                />
+                <input type="text" className="form-input" value={newThemeName}
+                  onChange={(e) => setNewThemeName(e.target.value)} placeholder="Ex: Dépenses exceptionnelles" />
               </div>
               <button type="submit" className="btn btn-primary">Créer</button>
             </form>
@@ -154,36 +212,68 @@ export default function CategoriesPage() {
             <form onSubmit={handleAddCategory}>
               <div className="form-group">
                 <label className="form-label">Thème</label>
-                <select
-                  className="form-select"
-                  value={selectedThemeId || ''}
-                  onChange={(e) => setSelectedThemeId(Number(e.target.value))}
-                >
+                <select className="form-select" value={selectedThemeId || ''}
+                  onChange={(e) => setSelectedThemeId(Number(e.target.value))}>
                   <option value="">Sélectionner...</option>
-                  {themes.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
+                  {themes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Nom de la catégorie</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  placeholder="Ex: Supermarché"
-                />
+                <input type="text" className="form-input" value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Ex: Supermarché" />
               </div>
               <div className="form-group">
                 <label className="form-label">Sous-catégories (séparées par virgule)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={newSubcategories}
-                  onChange={(e) => setNewSubcategories(e.target.value)}
-                  placeholder="Ex: Leclerc, Carrefour, Auchan"
-                />
+                <input type="text" className="form-input" value={newSubcategories}
+                  onChange={(e) => setNewSubcategories(e.target.value)} placeholder="Ex: Leclerc, Carrefour" />
+              </div>
+              <button type="submit" className="btn btn-primary">Créer</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Category Modal */}
+      {showEditCategory && editingCategory && (
+        <div className="modal-overlay" onClick={() => setShowEditCategory(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Modifier la catégorie</h3>
+              <button className="modal-close" onClick={() => setShowEditCategory(false)}>&times;</button>
+            </div>
+            <form onSubmit={handleEditCategory}>
+              <div className="form-group">
+                <label className="form-label">Nom de la catégorie</label>
+                <input type="text" className="form-input" value={editCategoryName}
+                  onChange={(e) => setEditCategoryName(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Thème</label>
+                <select className="form-select" value={editThemeId || ''}
+                  onChange={(e) => setEditThemeId(Number(e.target.value))}>
+                  {themes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <button type="submit" className="btn btn-primary">Enregistrer</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Subcategory Modal */}
+      {showAddSubcategory && (
+        <div className="modal-overlay" onClick={() => { setShowAddSubcategory(false); setSelectedCategoryId(null); }}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Nouvelle sous-catégorie</h3>
+              <button className="modal-close" onClick={() => { setShowAddSubcategory(false); setSelectedCategoryId(null); }}>&times;</button>
+            </div>
+            <form onSubmit={handleAddSubcategory}>
+              <div className="form-group">
+                <label className="form-label">Nom de la sous-catégorie</label>
+                <input type="text" className="form-input" value={newSubName}
+                  onChange={(e) => setNewSubName(e.target.value)} placeholder="Ex: Leclerc" />
               </div>
               <button type="submit" className="btn btn-primary">Créer</button>
             </form>
@@ -197,15 +287,13 @@ export default function CategoriesPage() {
           <div className="card-header">
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <h2 className="card-title">{theme.name}</h2>
-              <button
-                className="btn btn-secondary"
-                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                onClick={() => {
-                  setSelectedThemeId(theme.id);
-                  setShowAddCategory(true);
-                }}
-              >
+              <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                onClick={() => { setSelectedThemeId(theme.id); setShowAddCategory(true); }}>
                 + Catégorie
+              </button>
+              <button className="btn btn-danger" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                onClick={() => handleDeleteTheme(theme.id)}>
+                Supprimer
               </button>
             </div>
           </div>
@@ -219,6 +307,7 @@ export default function CategoriesPage() {
                   <tr>
                     <th>Catégorie</th>
                     <th>Sous-catégories</th>
+                    <th style={{ width: '150px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -226,17 +315,30 @@ export default function CategoriesPage() {
                     <tr key={cat.id}>
                       <td>{cat.name}</td>
                       <td>
-                        {cat.subcategories.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                            {cat.subcategories.map((sub) => (
-                              <span key={sub.id} className="badge badge-primary">
-                                {sub.name}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-light)' }}>-</span>
-                        )}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
+                          {cat.subcategories.length > 0 ? cat.subcategories.map((sub) => (
+                            <span key={sub.id} className="badge badge-primary" style={{ cursor: 'pointer' }}
+                              onClick={() => handleDeleteSubcategory(sub.id)} title="Cliquer pour supprimer">
+                              {sub.name} ×
+                            </span>
+                          )) : <span style={{ color: 'var(--text-light)' }}>-</span>}
+                          <button className="btn btn-secondary" style={{ padding: '0.1rem 0.3rem', fontSize: '0.65rem' }}
+                            onClick={() => { setSelectedCategoryId(cat.id); setShowAddSubcategory(true); }}>
+                            + sous-cat
+                          </button>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                            onClick={() => { setEditingCategory(cat); setEditCategoryName(cat.name); setEditThemeId(cat.theme_id); setShowEditCategory(true); }}>
+                            Modifier
+                          </button>
+                          <button className="btn btn-danger" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                            onClick={() => handleDeleteCategory(cat.id)}>
+                            Supprimer
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
