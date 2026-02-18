@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     if (type === 'monthly') {
       // Get monthly summary for current year or specified year
       const targetYear = year || new Date().getFullYear();
+      console.log('Monthly summary for year:', targetYear);
       
       const rows = await query(`
         SELECT 
@@ -26,8 +27,10 @@ export async function GET(request: NextRequest) {
         FROM transactions t
         WHERE YEAR(t.date) = ?
         GROUP BY YEAR(t.date), MONTH(t.date)
-        ORDER BY month
+        ORDER BY year, month
       `, [targetYear]) as any[];
+
+      console.log('Monthly rows:', rows);
 
       const summary = rows.map(row => ({
         month: row.month,

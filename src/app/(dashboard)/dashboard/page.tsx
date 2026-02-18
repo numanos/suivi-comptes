@@ -38,7 +38,10 @@ export default function DashboardPage() {
 
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
+  console.log('Dashboard: looking for month', currentMonth, 'year', currentYear);
+  console.log('Dashboard data:', data);
   const currentData = data.find(d => d.month === currentMonth && d.year === currentYear);
+  console.log('Current data found:', currentData);
   const ytdData = data.filter(d => d.year === currentYear);
 
   const ytdExpenses = ytdData.reduce((sum, d) => sum + d.total_expenses, 0);
