@@ -105,22 +105,7 @@ export async function GET(request: NextRequest) {
 
     if (type === 'summary') {
       const targetYear = year ? parseInt(year) : new Date().getFullYear();
-      
-      const availableYears = await query(`
-        SELECT DISTINCT year FROM placements WHERE year IS NOT NULL ORDER BY year DESC
-      `) as any[];
-      
-      let prevYear = targetYear - 1;
-      if (availableYears.length > 0) {
-        const yearsWithData = availableYears.map(r => r.year);
-        if (!yearsWithData.includes(targetYear)) {
-          if (yearsWithData.length >= 2) {
-            prevYear = yearsWithData[1];
-          } else if (yearsWithData.length === 1) {
-            prevYear = yearsWithData[0];
-          }
-        }
-      }
+      const prevYear = targetYear - 1;
       
       const rows = await query(`
         SELECT 
@@ -131,6 +116,8 @@ export async function GET(request: NextRequest) {
         GROUP BY p.type_placement
       `, [targetYear]) as any[];
 
+      const hasDataForYear = rows.length > 0 && rows.some(r => r.total > 0);
+
       const totals: Record<string, number> = {
         'Action': 0,
         'Immo': 0,
@@ -139,7 +126,7 @@ export async function GET(request: NextRequest) {
       };
 
       for (const row of rows) {
-        totals[row.type] = row.total || 0;
+        totals[row.type] = Number(row.total) || 0;
       }
 
       const total = Object.values(totals).reduce((a: number, b: number) => a + b, 0);
@@ -159,7 +146,7 @@ export async function GET(request: NextRequest) {
       };
 
       for (const row of prevYearRows) {
-        prevTotals[row.type] = row.total || 0;
+        prevTotals[row.type] = Number(row.total) || 0;
       }
 
       const prevTotal = Object.values(prevTotals).reduce((a: number, b: number) => a + b, 0);
@@ -167,6 +154,7 @@ export async function GET(request: NextRequest) {
       const summary = {
         year: targetYear,
         prevYear,
+        hasData: hasDataForYear,
         totals,
         total,
         prevTotals,
@@ -261,6 +249,13 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const envelopeId = searchParams.get('envelope_id');
+    const year = searchParams.get('year');
+
+    if (envelopeId && year) {
+      await query('DELETE FROM placements WHERE envelope_id = ? AND year = ?', [parseInt(envelopeId), parseInt(year)]);
+      return NextResponse.json({ success: true });
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'ID requis' }, { status: 400 });

@@ -17,6 +17,7 @@ interface EvolutionData {
 interface SummaryData {
   year: number;
   prevYear: number;
+  hasData: boolean;
   totals: {
     Action: number;
     Immo: number;
@@ -145,23 +146,32 @@ export default function PatrimoinePage() {
 
       {/* Stats for selected year */}
       {summaryData && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">Total {summaryData.year}</div>
-            <div className="stat-value">{formatAmount(summaryData.total)}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-label">Évolution vs {summaryData.prevYear}</div>
-            <div className={`stat-value ${(summaryData.evolution.total || 0) >= 0 ? 'positive' : 'negative'}`}>
-              {formatAmount(summaryData.evolution.total)}
+        <>
+          {!summaryData.hasData && (
+            <div className="card" style={{ borderLeft: '4px solid #f59e0b', backgroundColor: '#fffbeb' }}>
+              <p style={{ color: '#92400e', margin: 0 }}>
+                <strong>Pas de données pour {summaryData.year}</strong>. Veuillez sélectionner une année avec des données saisies.
+              </p>
             </div>
-            {summaryData.evolutionPercent.total !== null && (
-              <span className={`badge ${summaryData.evolutionPercent.total >= 0 ? 'badge-success' : 'badge-danger'}`}>
-                {formatPercent(summaryData.evolutionPercent.total)}
-              </span>
-            )}
+          )}
+          <div className="stats-grid">
+            <div className="stat-card">
+              <div className="stat-label">Total {summaryData.year}</div>
+              <div className="stat-value">{formatAmount(summaryData.total)}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Évolution vs {summaryData.prevYear}</div>
+              <div className={`stat-value ${(summaryData.evolution.total || 0) >= 0 ? 'positive' : 'negative'}`}>
+                {formatAmount(summaryData.evolution.total)}
+              </div>
+              {summaryData.evolutionPercent.total !== null && (
+                <span className={`badge ${summaryData.evolutionPercent.total >= 0 ? 'badge-success' : 'badge-danger'}`}>
+                  {formatPercent(summaryData.evolutionPercent.total)}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* Evolution chart */}
@@ -177,11 +187,11 @@ export default function PatrimoinePage() {
               <YAxis />
               <Tooltip formatter={(value: number) => formatAmount(value)} />
               <Legend />
-              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={{ r: 5 }} />
-              <Line type="monotone" dataKey="Actions" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="Immobilier" stroke={COLORS[1]} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="Obligations" stroke={COLORS[2]} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="Liquidites" stroke={COLORS[3]} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={{ r: 5, fill: '#000' }} activeDot={{ r: 8 }} />
+              <Line type="monotone" dataKey="Actions" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 4, fill: COLORS[0] }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="Immobilier" stroke={COLORS[1]} strokeWidth={2} dot={{ r: 4, fill: COLORS[1] }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="Obligations" stroke={COLORS[2]} strokeWidth={2} dot={{ r: 4, fill: COLORS[2] }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="Liquidites" stroke={COLORS[3]} strokeWidth={2} dot={{ r: 4, fill: COLORS[3] }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

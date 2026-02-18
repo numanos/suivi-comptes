@@ -334,6 +334,15 @@ export default function BudgetPage() {
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: 0, alignSelf: 'flex-end' }}>
+            <button className="btn btn-secondary" onClick={() => {
+              setFilterLibelle('');
+              setFilterCategory('');
+              setFilterSubcategory('');
+            }}>
+              Effacer
+            </button>
+          </div>
+          <div className="form-group" style={{ marginBottom: 0, alignSelf: 'flex-end' }}>
             <button className="btn btn-primary" onClick={fetchTransactions}>
               Filtrer
             </button>

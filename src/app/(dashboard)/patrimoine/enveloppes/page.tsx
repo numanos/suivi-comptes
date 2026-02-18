@@ -118,10 +118,11 @@ export default function EnveloppesPage() {
   };
 
   const handleDeleteEnvelope = async (id: number) => {
-    if (!confirm('Supprimer cette enveloppe et tous ses placements ?')) return;
+    const currentYear = parseInt(year);
+    if (!confirm(`Supprimer les placements de ${currentYear} pour cette enveloppe ? L\'historique des autres années sera préservé.`)) return;
     
     try {
-      await fetch(`/api/patrimoine?id=${id}`, { method: 'DELETE' });
+      await fetch(`/api/patrimoine?envelope_id=${id}&year=${currentYear}`, { method: 'DELETE' });
       fetchEnvelopes();
     } catch (error) {
       console.error(error);
