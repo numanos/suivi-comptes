@@ -316,8 +316,8 @@ export default function EnveloppesPage() {
       ) : (
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {envelopes.map((envelope) => {
-            const totalValorization = envelope.placements.reduce((sum, p) => sum + (p.valorization || 0), 0);
-            const gain = totalValorization - envelope.versements;
+            const totalValorization = envelope.placements.reduce((sum, p) => sum + (Number(p.valorization) || 0), 0);
+            const gain = totalValorization - (Number(envelope.versements) || 0);
             
             return (
               <div key={envelope.id} className="card">
@@ -363,7 +363,7 @@ export default function EnveloppesPage() {
                       <span>Valorisation {year}: <strong>{formatAmount(totalValorization)}</strong></span>
                       <span style={{ marginLeft: '1rem' }}>
                         Gain: <span className={gain >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                          {formatAmount(gain)} ({(gain / envelope.versements * 100).toFixed(1)}%)
+                          {formatAmount(gain)} ({envelope.versements > 0 ? (gain / envelope.versements * 100).toFixed(1) : '0'}%)
                         </span>
                       </span>
                     </div>
