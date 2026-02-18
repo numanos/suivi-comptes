@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 interface Placement {
   id: number;
@@ -226,6 +227,35 @@ export default function EnveloppesPage() {
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
   };
 
+  const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#64748b'];
+
+  const pieData = useMemo(() => {
+    const totals: Record<string, number> = { Action: 0, Immo: 0, Obligations: 0, Liquidites: 0 };
+    let total = 0;
+    for (const env of envelopes) {
+      for (const p of env.placements) {
+        if (p.type_placement && p.valorization) {
+          totals[p.type_placement] = (totals[p.type_placement] || 0) + Number(p.valorization);
+          total += Number(p.valorization);
+        }
+      }
+    }
+    return Object.entries(totals)
+      .filter(([_, value]) => value > 0)
+      .map(([name, value]) => ({
+        name,
+        value,
+        percent: total > 0 ? (value / total) * 100 : 0
+      }));
+  }, [envelopes]);
+
+  const TYPE_LABELS: Record<string, string> = {
+    Action: 'Actions',
+    Immo: 'Immobilier',
+    Obligations: 'Obligations',
+    Liquidites: 'Liquidités'
+  };
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'Action': return 'badge-primary';
@@ -256,6 +286,47 @@ export default function EnveloppesPage() {
           </div>
         </div>
       </div>
+
+      {pieData.length > 0 && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Répartition du patrimoine {year}</h2>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem', padding: '1rem' }}>
+            <div style={{ width: 300, height: 300 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label={({ name, percent }) => `${(percent * 100).toFixed(1)}%`}
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => formatAmount(value)} />
+                  <Legend formatter={(value) => TYPE_LABELS[value] || value} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div>
+              {pieData.map((item, idx) => (
+                <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: COLORS[idx] }}></span>
+                  <span>{TYPE_LABELS[item.name] || item.name}:</span>
+                  <strong>{formatAmount(item.value)}</strong>
+                  <span style={{ color: 'var(--text-light)' }}>({item.percent.toFixed(1)}%)</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddEnvelope && (
         <div className="modal-overlay" onClick={() => setShowAddEnvelope(false)}>

@@ -106,6 +106,22 @@ export async function GET(request: NextRequest) {
     if (type === 'summary') {
       const targetYear = year ? parseInt(year) : new Date().getFullYear();
       
+      const availableYears = await query(`
+        SELECT DISTINCT year FROM placements WHERE year IS NOT NULL ORDER BY year DESC
+      `) as any[];
+      
+      let prevYear = targetYear - 1;
+      if (availableYears.length > 0) {
+        const yearsWithData = availableYears.map(r => r.year);
+        if (!yearsWithData.includes(targetYear)) {
+          if (yearsWithData.length >= 2) {
+            prevYear = yearsWithData[1];
+          } else if (yearsWithData.length === 1) {
+            prevYear = yearsWithData[0];
+          }
+        }
+      }
+      
       const rows = await query(`
         SELECT 
           p.type_placement as type,
@@ -133,7 +149,7 @@ export async function GET(request: NextRequest) {
         FROM placements p
         WHERE p.year = ?
         GROUP BY p.type_placement
-      `, [targetYear - 1]) as any[];
+      `, [prevYear]) as any[];
 
       const prevTotals: Record<string, number> = {
         'Action': 0,
@@ -150,6 +166,7 @@ export async function GET(request: NextRequest) {
 
       const summary = {
         year: targetYear,
+        prevYear,
         totals,
         total,
         prevTotals,

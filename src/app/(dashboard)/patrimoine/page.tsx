@@ -16,6 +16,7 @@ interface EvolutionData {
 
 interface SummaryData {
   year: number;
+  prevYear: number;
   totals: {
     Action: number;
     Immo: number;
@@ -150,7 +151,7 @@ export default function PatrimoinePage() {
             <div className="stat-value">{formatAmount(summaryData.total)}</div>
           </div>
           <div className="stat-card">
-            <div className="stat-label">Évolution vs {summaryData.year - 1}</div>
+            <div className="stat-label">Évolution vs {summaryData.prevYear}</div>
             <div className={`stat-value ${(summaryData.evolution.total || 0) >= 0 ? 'positive' : 'negative'}`}>
               {formatAmount(summaryData.evolution.total)}
             </div>
@@ -198,7 +199,7 @@ export default function PatrimoinePage() {
                 <tr>
                   <th>Type</th>
                   <th style={{ textAlign: 'right' }}>Montant {summaryData.year}</th>
-                  <th style={{ textAlign: 'right' }}>Montant {summaryData.year - 1}</th>
+                  <th style={{ textAlign: 'right' }}>Montant {summaryData.prevYear}</th>
                   <th style={{ textAlign: 'right' }}>Évolution</th>
                   <th style={{ textAlign: 'right' }}>Évolution %</th>
                 </tr>
