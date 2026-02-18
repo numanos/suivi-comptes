@@ -1,4 +1,4 @@
-# Projet Suivi Comptes - Contexte de conversation
+# Projet Suivi Comptes - Contexte complet
 
 ## Objectif
 Application web de suivi de budget et patrimoine avec :
@@ -32,54 +32,109 @@ Application web de suivi de budget et patrimoine avec :
   3. Catégories ne correspondant pas malgré les problèmes d'encodage
 - La détection de doublons doit vérifier : date + libellé EXACT + montant
 
-## Fichiers importants
-- `/mnt/c/Users/antie/Desktop/Projet suivi comptes/suivi-comptes/src/app/api/transactions/route.ts` - Fichier principal pour l'import CSV
-- `/mnt/c/Users/antie/Desktop/Projet suivi comptes/suivi-comptes/src/app/(dashboard)/budget/page.tsx` - Page budget avec UI d'import
-- `/mnt/c/Users/antie/Desktop/Projet suivi comptes/suivi-comptes/src/app/(dashboard)/admin/page.tsx` - Page admin purge
-- `/mnt/c/Users/antie/Desktop/Projet suivi comptes/suivi-comptes/` - Répertoire principal du projet
-- `/mnt/c/Users/antie/Desktop/Projet suivi comptes/Sample datas.csv` - Fichier CSV de test
+## Structure du projet
 
-## Échanges / Actions réalisées
+```
+suivi-comptes/
+├── src/
+│   ├── app/
+│   │   ├── (dashboard)/
+│   │   │   ├── budget/page.tsx      # Page budget avec import CSV
+│   │   │   ├── admin/page.tsx       # Page admin pour purger les données
+│   │   │   ├── patrimoine/          # Pages patrimoine
+│   │   │   └── layout.tsx
+│   │   ├── api/
+│   │   │   ├── transactions/route.ts # Import/GET/PUT/DELETE transactions
+│   │   │   ├── categories/          # API catégories
+│   │   │   ├── subcategories/       # API sous-catégories
+│   │   │   ├── themes/              # API thèmes
+│   │   │   └── envelopes/           # API enveloppes
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   └── lib/
+│       ├── db.ts                    # Connexion MySQL
+│       └── db-init.ts               # Initialisation base de données
+├── .env.local                       # Variables d'environnement
+├── package.json
+└── CONTEXT.md                      # Ce fichier
+```
 
-### 2026-02-18
+## Schéma de base de données
 
-**Question initiale :** Qu'avons-nous fait jusqu'à présent ?
-**Réponse :** Résumé complet des accomplishments et next steps.
+```sql
+-- Tables principales
+users (id, email, name, created_at)
+themes (id, name, type, created_at)
+categories (id, name, theme_id, created_at)
+subcategories (id, name, category_id, created_at)
+transactions (id, date, libelle, note, amount, category_id, subcategory_id, balance, is_pointed, tags, import_batch_id, created_at)
+import_batches (id, filename, record_count, created_at)
+envelopes (id, name, amount, category_id, year, month, created_at)
+placements (id, name, amount, type, date, created_at)
+```
 
-**Action 1 :** Lecture du fichier route.ts pour continuer le travail
-- Le fichier contenait déjà une fonction `fixEncoding()` mais elle n'était pas utilisée
-- La fonction `transactionExists()` était appelée mais non définie
+## Historique Git complet
 
-**Action 2 :** Corrections apportées à `/src/app/api/transactions/route.ts` :
-1. Ajout de la fonction `transactionExists()` pour détection de doublons exacts
-2. Application de `fixEncoding()` aux champs parsés du CSV (libelle, note, category, subcategory)
-3. Application de `fixEncoding()` aux catégories/sous-catégories stockées dans les lookup maps
+```bash
+25b46a9 Initial commit - suivi-comptes app
+5e62310 Fix import CSV, add admin page, edit categories
+42b89cd Add edit/delete/bulk delete for transactions
+72c0161 Fix import function was missing
+5c80e78 Fix import - correct column mapping and encoding handling
+8816843 Fix duplicate detection - case insensitive
+e91c1bc Fix import - handle encoding and empty libelle
+b2cb3e0 Fix import - position-based column parsing, handle encoding
+e44fc74 Fix column mapping - exact match and better logging
+a976fa2 Fix import - full encoding fix, better category matching
+3303649 Fix syntax error in encoding conversion
+30235d1 Fix import - proper category matching, exact duplicate check, no encoding conversion
+e5652f0 Fix CSV encoding and duplicate detection
+4b21d13 Fix: read CSV as ISO-8859-1
+d7767e0 Add conversation context file
+```
 
-**Action 3 :** Commit et push vers GitHub
-- Commit: "Fix CSV encoding and duplicate detection"
+## Problèmes et corrections effectuées
 
-**Feedback utilisateur :** "il y a toujours les soucis d'encodage - des doublons sont toujours détectés"
+### 1. Import CSV - Problèmes d'encodage
+- **Problème:** Le fichier CSV est encodé en ISO-8859-1, les caractères accentués apparaissent comme "ý" au lieu de "é"
+- **Solution:** Utiliser `TextDecoder('iso-8859-1')` pour lire le fichier
 
-**Action 4 :** Problème identifié - `file.text()` décode le fichier en UTF-8 directement, donc les octets ISO-8859-1 ne sont plus disponibles
+### 2. Détection de doublons
+- **Problème:** Les doublons étaient détectés faussement à cause de différences de casse
+- **Solution:** Vérification exacte sur date + libellé + montant
 
-**Action 5 :** Correction de la lecture du fichier
-- Remplacé `let text = await file.text();` par :
-  ```typescript
-  const buffer = await file.arrayBuffer();
-  const decoder = new TextDecoder('iso-8859-1');
-  let text = decoder.decode(buffer);
-  ```
+### 3. Correspondance des catégories
+- **Problème:** Les catégories du CSV ne correspondait pas à celles en base
+- **Solution:** Normalisation des noms pour la comparaison + création automatique des catégories manquantes
 
-**Action 6 :** Commit et push
-- Commit: "Fix: read CSV as ISO-8859-1"
-- Push vers numanos/suivi-comptes
+### 4. Fonction transactionExists manquante
+- **Problème:** La fonction était appelée mais non définie
+- **Solution:** Ajout de la fonction dans route.ts
 
-## Prochaines étapes
-1. L'utilisateur doit pull les changements et tester l'import
-2. Vérifier que l'encodage est maintenant correct
-3. Vérifier que les doublons ne sont plus faussement détectés
+## Fichiers clés modifiés récemment
+
+### `/src/app/api/transactions/route.ts`
+Fonctions principales :
+- `normalizeForMatch()` - Normalise pour comparaison
+- `findOrCreateCategory()` - Trouve ou crée une catégorie
+- `findOrCreateSubcategory()` - Trouve ou crée une sous-catégorie
+- `guessTheme()` - Devine le thème d'une catégorie
+- `fixEncoding()` - Convertit ISO-8859-1 vers UTF-8
+- `parseCSVLine()` - Parse une ligne CSV
+- `transactionExists()` - Vérifie si une transaction existe déjà
+
+Route POST : Import CSV
+- Lit le fichier en ISO-8859-1
+- Parse les colonnes (date, libellé, montant, etc.)
+- Crée les catégories/sous-catégories si besoin
+- Insère les transactions en vérifiant les doublons
+
+Route GET : Liste les transactions avec filtres
+Route PUT : Met à jour une transaction
+Route DELETE : Supprime une/des transaction(s)
 
 ## Commandes utiles
+
 ```bash
 # Pull les derniers changements
 git pull
@@ -89,4 +144,18 @@ npm run dev
 
 # Tester l'import avec le fichier CSV
 # Aller sur http://localhost:3000/budget
+
+# Builder pour production
+npm run build
+
+# Lancer en production
+npm start
+```
+
+## Environment (.env.local)
+```
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=***
+DB_NAME=suivi_comptes
 ```
