@@ -213,11 +213,6 @@ export default function EnveloppesPage() {
       console.error(error);
     }
   };
-      fetchEnvelopes();
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   const openEditPlacement = (placement: Placement) => {
     setEditingPlacement(placement);
@@ -370,17 +365,6 @@ export default function EnveloppesPage() {
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Versements cumulés</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-input"
-                  value={newPlacementVersements}
-                  onChange={(e) => setNewPlacementVersements(e.target.value)}
-                  placeholder="Montant total des versements"
-                />
               </div>
               <div className="form-group">
                 <label className="form-label">Valorisation {year}</label>

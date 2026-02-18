@@ -205,10 +205,11 @@ export default function PatrimoinePage() {
               </thead>
               <tbody>
                 {TYPES.map((type, idx) => {
-                  const current = summaryData.totals[type] || 0;
-                  const prev = summaryData.prevTotals[type] || 0;
-                  const evol = summaryData.evolution[type] || 0;
-                  const evolPercent = summaryData.evolutionPercent[type];
+                  const typeKey = type as keyof typeof summaryData.totals;
+                  const current = summaryData.totals[typeKey] || 0;
+                  const prev = summaryData.prevTotals[typeKey] || 0;
+                  const evol = summaryData.evolution[typeKey] || 0;
+                  const evolPercent = summaryData.evolutionPercent[typeKey];
                   
                   return (
                     <tr key={type}>
