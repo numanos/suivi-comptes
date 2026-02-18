@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface EvolutionData {
   year: number;
@@ -193,27 +193,18 @@ export default function PatrimoinePage() {
         </div>
         <div className="chart-container">
           <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+            <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="year" />
               <YAxis />
               <Tooltip formatter={(value: number) => formatAmount(value)} />
               <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="Total" 
-                stroke="#000" 
-                strokeWidth={3} 
-                dot={{ r: 6, fill: '#000' }} 
-                activeDot={{ r: 8 }}
-              >
-                <LabelList dataKey="Total" position="top" formatter={(value: number) => formatAmount(value)} />
-              </Line>
-              <Line type="monotone" dataKey="Actions" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 4, fill: COLORS[0] }} activeDot={{ r: 6 }} />
-              <Line type="monotone" dataKey="Immobilier" stroke={COLORS[1]} strokeWidth={2} dot={{ r: 4, fill: COLORS[1] }} activeDot={{ r: 6 }} />
-              <Line type="monotone" dataKey="Obligations" stroke={COLORS[2]} strokeWidth={2} dot={{ r: 4, fill: COLORS[2] }} activeDot={{ r: 6 }} />
-              <Line type="monotone" dataKey="Liquidites" stroke={COLORS[3]} strokeWidth={2} dot={{ r: 4, fill: COLORS[3] }} activeDot={{ r: 6 }} />
-            </LineChart>
+              <Area type="monotone" dataKey="Liquidites" stackId="1" stroke={COLORS[3]} fill={COLORS[3]} fillOpacity={0.6} />
+              <Area type="monotone" dataKey="Obligations" stackId="1" stroke={COLORS[2]} fill={COLORS[2]} fillOpacity={0.6} />
+              <Area type="monotone" dataKey="Immobilier" stackId="1" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={0.6} />
+              <Area type="monotone" dataKey="Actions" stackId="1" stroke={COLORS[0]} fill={COLORS[0]} fillOpacity={0.6} />
+              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={false} />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
