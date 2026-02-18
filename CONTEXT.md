@@ -31,6 +31,7 @@ Application web de suivi de budget et patrimoine avec :
   2. Fausse détection de doublons
   3. Catégories ne correspondant pas malgré les problèmes d'encodage
 - La détection de doublons doit vérifier : date + libellé EXACT + montant
+- Les doublons dans le fichier CSV (mêmes date+libellé+montant) ne sont pas necessarily des erreurs - ce sont souvent des vrais paiements effectués 2 fois le même jour
 
 ## Structure du projet
 
@@ -91,6 +92,14 @@ a976fa2 Fix import - full encoding fix, better category matching
 e5652f0 Fix CSV encoding and duplicate detection
 4b21d13 Fix: read CSV as ISO-8859-1
 d7767e0 Add conversation context file
+39a198d Update context with full history and structure
+a21852f Add debug logging for duplicate detection
+207ceb3 Fix duplicate detection: add TRIM and progress logging
+c426378 Log only duplicates detected
+09dcb63 Add node_modules to gitignore
+acbc6aa Add duplicate confirmation modal for CSV import
+c5698c0 Add debug logging for dryRun
+5a5b6b9 Fix: re-add duplicate rows when user chooses to import all
 ```
 
 ## Problèmes et corrections effectuées
@@ -101,7 +110,7 @@ d7767e0 Add conversation context file
 
 ### 2. Détection de doublons
 - **Problème:** Les doublons étaient détectés faussement à cause de différences de casse
-- **Solution:** Vérification exacte sur date + libellé + montant
+- **Solution:** Vérification exacte sur date + libellé + montant + TRIM()
 
 ### 3. Correspondance des catégories
 - **Problème:** Les catégories du CSV ne correspondait pas à celles en base
@@ -110,6 +119,27 @@ d7767e0 Add conversation context file
 ### 4. Fonction transactionExists manquante
 - **Problème:** La fonction était appelée mais non définie
 - **Solution:** Ajout de la fonction dans route.ts
+
+### 5. Confirmation de doublons dans le fichier CSV
+- **Problème:** Des paiements différents mais avec même libellé et montant étaient détectés comme doublons
+- **Solution:** Ajout d'une fenêtre de confirmation qui affiche les doublons détectés et laisse le choix à l'utilisateur d'importer ou non
+
+## Fonctionnalités implémentées
+
+### Import CSV
+- Lecture du fichier en ISO-8859-1
+- Dry-run pour détecter les doublons dans le fichier
+- Fenêtre de confirmation avec liste des doublons
+- Trois options :
+  1. Importer en ignorant les doublons (lignes uniques uniquement)
+  2. Importer quand même (toutes les lignes)
+  3. Annuler
+
+### Gestion des transactions
+- Liste avec filtres par année/mois
+- Édition (libellé, note, catégorie, sous-catégorie)
+- Suppression simple et suppression en masse
+- Selection multiple avec case à cocher
 
 ## Fichiers clés modifiés récemment
 
@@ -121,17 +151,17 @@ Fonctions principales :
 - `guessTheme()` - Devine le thème d'une catégorie
 - `fixEncoding()` - Convertit ISO-8859-1 vers UTF-8
 - `parseCSVLine()` - Parse une ligne CSV
-- `transactionExists()` - Vérifie si une transaction existe déjà
+- `transactionExists()` - Vérifie si une transaction existe déjà en base
 
 Route POST : Import CSV
-- Lit le fichier en ISO-8859-1
-- Parse les colonnes (date, libellé, montant, etc.)
-- Crée les catégories/sous-catégories si besoin
-- Insère les transactions en vérifiant les doublons
+- Mode dryRun : retourne les infos de doublons sans importer
+- Mode normal : importe avec option skipDuplicates
+- Parse toutes les lignes pour détecter les doublons dans le fichier
 
-Route GET : Liste les transactions avec filtres
-Route PUT : Met à jour une transaction
-Route DELETE : Supprime une/des transaction(s)
+### `/src/app/(dashboard)/budget/page.tsx`
+- Import CSV avec fenêtre de confirmation de doublons
+- Liste des transactions avec filtres
+- Édition et suppression
 
 ## Commandes utiles
 
@@ -159,3 +189,9 @@ DB_USER=root
 DB_PASSWORD=***
 DB_NAME=suivi_comptes
 ```
+
+## État actuel (2026-02-18)
+- Import CSV fonctionnel avec encodage ISO-8859-1
+- Fenêtre de confirmation pour les doublons du fichier
+- Débogage activé (logs dans la console serveur)
+- Purger les transactions avant de tester pour éviter les doublons en base
