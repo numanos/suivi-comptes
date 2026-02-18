@@ -11,13 +11,15 @@ export async function GET(request: NextRequest) {
       const targetYear = year || new Date().getFullYear();
       
       const envelopes = await query(`
-        SELECT e.id, e.name, e.versements, e.exclude_from_gains,
+        SELECT e.id, e.name, e.exclude_from_gains,
+               ev.versements as year_versements,
                p.id as placement_id, p.name as placement_name, 
                p.type_placement, p.year, p.valorization
         FROM envelopes e
+        LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
         LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
         ORDER BY e.name
-      `, [targetYear]) as any[];
+      `, [targetYear, targetYear]) as any[];
 
       const envelopeMap = new Map();
       for (const row of envelopes) {
@@ -25,8 +27,8 @@ export async function GET(request: NextRequest) {
           envelopeMap.set(row.id, {
             id: row.id,
             name: row.name,
-            versements: row.versements || 0,
             exclude_from_gains: Boolean(row.exclude_from_gains),
+            year_versements: row.year_versements || 0,
             placements: []
           });
         }
@@ -180,7 +182,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, versements } = await request.json();
+    const { name, versements, year, exclude_from_gains } = await request.json();
 
     if (!name) {
       return NextResponse.json(
@@ -190,11 +192,20 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await query(
-      'INSERT INTO envelopes (name, versements) VALUES (?, ?)',
-      [name, versements || 0]
+      'INSERT INTO envelopes (name, exclude_from_gains) VALUES (?, ?)',
+      [name, exclude_from_gains ? true : false]
     ) as any;
 
-    return NextResponse.json({ success: true, id: result.insertId });
+    const envelopeId = result.insertId;
+
+    if (versements && year) {
+      await query(
+        'INSERT INTO envelope_versements (envelope_id, year, versements) VALUES (?, ?, ?)',
+        [envelopeId, year, versements]
+      );
+    }
+
+    return NextResponse.json({ success: true, id: envelopeId });
   } catch (error) {
     console.error('Error creating envelope:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
@@ -203,16 +214,24 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, name, versements, exclude_from_gains } = await request.json();
+    const { id, name, exclude_from_gains, year, versements } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'ID requis' }, { status: 400 });
     }
 
     await query(
-      'UPDATE envelopes SET name = ?, versements = ?, exclude_from_gains = ? WHERE id = ?',
-      [name || '', versements || 0, exclude_from_gains ? true : false, id]
+      'UPDATE envelopes SET name = ?, exclude_from_gains = ? WHERE id = ?',
+      [name || '', exclude_from_gains ? true : false, id]
     );
+
+    if (year && versements !== undefined) {
+      await query(
+        `INSERT INTO envelope_versements (envelope_id, year, versements) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE versements = ?`,
+        [id, year, versements, versements]
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

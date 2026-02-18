@@ -80,9 +80,19 @@ CREATE INDEX idx_transactions_month ON transactions(date);
 CREATE TABLE IF NOT EXISTS envelopes (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
-  versements DECIMAL(12,2) DEFAULT 0,
   exclude_from_gains BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Envelope versements (par année, cumulatif)
+CREATE TABLE IF NOT EXISTS envelope_versements (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  envelope_id INT NOT NULL,
+  year INT NOT NULL,
+  versements DECIMAL(12,2) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (envelope_id) REFERENCES envelopes(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_envelope_year (envelope_id, year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Placements table

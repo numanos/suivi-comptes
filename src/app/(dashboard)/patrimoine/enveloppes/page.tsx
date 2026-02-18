@@ -14,8 +14,8 @@ interface Placement {
 interface Envelope {
   id: number;
   name: string;
-  versements: number;
   exclude_from_gains: boolean;
+  year_versements: number;
   placements: Placement[];
 }
 
@@ -35,8 +35,8 @@ export default function EnveloppesPage() {
   
   const [newEnvelopeName, setNewEnvelopeName] = useState('');
   const [newEnvelopeVersements, setNewEnvelopeVersements] = useState('');
-  const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
   const [editExcludeFromGains, setEditExcludeFromGains] = useState(false);
+  const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
   
   const [newPlacementName, setNewPlacementName] = useState('');
   const [newPlacementType, setNewPlacementType] = useState('Action');
@@ -79,6 +79,7 @@ export default function EnveloppesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newEnvelopeName,
+          year: parseInt(year),
           versements: parseFloat(newEnvelopeVersements) || 0
         })
       });
@@ -102,8 +103,9 @@ export default function EnveloppesPage() {
         body: JSON.stringify({
           id: editingEnvelope.id,
           name: editingEnvelope.name,
-          versements: parseFloat(editEnvelopeVersements) || 0,
-          exclude_from_gains: editExcludeFromGains
+          exclude_from_gains: editExcludeFromGains,
+          year: parseInt(year),
+          versements: parseFloat(editEnvelopeVersements) || 0
         })
       });
       setShowEditEnvelope(false);
@@ -190,7 +192,7 @@ export default function EnveloppesPage() {
     setEditingPlacement(placement);
     setEditPlacementName(placement.name);
     setEditPlacementType(placement.type_placement);
-    setEditPlacementValorization(placement.valorization?.toString() || '');
+    setEditPlacementValorization(placement.valorization?.toString() || '0');
     setShowEditPlacement(true);
   };
 
@@ -339,6 +341,17 @@ export default function EnveloppesPage() {
                 </select>
               </div>
               <div className="form-group">
+                <label className="form-label">Versements cumulés</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={newPlacementVersements}
+                  onChange={(e) => setNewPlacementVersements(e.target.value)}
+                  placeholder="Montant total des versements"
+                />
+              </div>
+              <div className="form-group">
                 <label className="form-label">Valorisation {year}</label>
                 <input
                   type="number"
@@ -414,14 +427,14 @@ export default function EnveloppesPage() {
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {envelopes.map((envelope) => {
             const totalValorization = envelope.placements.reduce((sum, p) => sum + (Number(p.valorization) || 0), 0);
-            const gain = envelope.exclude_from_gains ? null : totalValorization - (Number(envelope.versements) || 0);
+            const gain = envelope.exclude_from_gains ? null : totalValorization - (Number(envelope.year_versements) || 0);
             
             return (
               <div key={envelope.id} className="card">
                 <div className="card-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <h2 className="card-title">{envelope.name}</h2>
-                    <span className="badge badge-secondary">{formatAmount(envelope.versements)} versés</span>
+                    <span className="badge badge-secondary">{formatAmount(envelope.year_versements)} versés</span>
                     {envelope.exclude_from_gains && <span className="badge badge-warning">Gain désactivé</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -429,7 +442,7 @@ export default function EnveloppesPage() {
                       className="btn btn-secondary"
                       onClick={() => {
                         setEditingEnvelope(envelope);
-                        setEditEnvelopeVersements(envelope.versements?.toString() || '0');
+                        setEditEnvelopeVersements(envelope.year_versements?.toString() || '0');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}
@@ -467,7 +480,7 @@ export default function EnveloppesPage() {
                       ) : (
                         <span style={{ marginLeft: '1rem' }}>
                           Gain: <span className={gain !== null && gain >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                            {gain !== null ? formatAmount(gain) : '-'} ({envelope.versements > 0 ? (gain! / envelope.versements * 100).toFixed(1) : '0'}%)
+                            {gain !== null ? formatAmount(gain) : '-'} ({envelope.year_versements > 0 ? (gain! / envelope.year_versements * 100).toFixed(1) : '0'}%)
                           </span>
                         </span>
                       )}
