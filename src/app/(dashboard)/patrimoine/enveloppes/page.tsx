@@ -47,9 +47,15 @@ export default function EnveloppesPage() {
     try {
       const res = await fetch(`/api/patrimoine?type=envelopes&year=${year}`);
       const data = await res.json();
-      setEnvelopes(data);
+      if (Array.isArray(data)) {
+        setEnvelopes(data);
+      } else {
+        console.error('API returned error:', data);
+        setEnvelopes([]);
+      }
     } catch (error) {
       console.error(error);
+      setEnvelopes([]);
     } finally {
       setLoading(false);
     }
