@@ -40,7 +40,7 @@ export default function DashboardPage() {
   const currentMonth = new Date().getMonth() + 1;
   console.log('Dashboard: looking for month', currentMonth, 'year', currentYear);
   console.log('Dashboard data:', data);
-  const currentData = data.find(d => d.month === currentMonth && d.year === currentYear);
+  const currentData = data.find(d => Number(d.month) === currentMonth && Number(d.year) === currentYear);
   console.log('Current data found:', currentData);
   const ytdData = data.filter(d => d.year === currentYear);
 
