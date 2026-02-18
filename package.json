@@ -1,0 +1,35 @@
+{
+  "name": "suivi-comptes",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:init": "npx ts-node --project tsconfig.node.json src/lib/db-init.ts",
+    "db:seed": "node src/lib/seed.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "cookie": "^0.6.0",
+    "json2csv": "^6.0.0-alpha.2",
+    "mysql2": "^3.9.7",
+    "next": "14.1.0",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie": "^0.6.0",
+    "@types/node": "^20.12.12",
+    "@types/papaparse": "^5.3.14",
+    "@types/react": "^18.3.2",
+    "@types/react-dom": "^18.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}
