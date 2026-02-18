@@ -292,10 +292,6 @@ export async function POST(request: NextRequest) {
     console.log('Starting import of', data.length, 'rows');
 
     for (let i = 0; i < data.length; i++) {
-      if (i % 100 === 0) {
-        console.log(`Progress: ${i}/${data.length} rows`);
-      }
-      
       try {
         const row = data[i];
         
@@ -340,6 +336,7 @@ export async function POST(request: NextRequest) {
 
         // Check for duplicate - exact match on date + libelle + amount
         if (await transactionExists(date, finalLibelle, amount)) {
+          console.log(`DUPLICATE: date=${date}, libelle=${finalLibelle.trim()}, amount=${amount}`);
           skipped++;
           continue;
         }
