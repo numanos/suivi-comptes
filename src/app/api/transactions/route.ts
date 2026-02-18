@@ -173,17 +173,24 @@ export async function POST(request: NextRequest) {
     const headerLine = lines[0];
     const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().trim());
     
-    // Find column indices
-    const dateIdx = headers.findIndex(h => h.includes('date'));
-    const libelleIdx = headers.findIndex(h => h.includes('libell'));
-    const noteIdx = headers.findIndex(h => h.includes('note'));
-    const montantIdx = headers.findIndex(h => h.includes('montant'));
-    const categorieIdx = headers.findIndex(h => h.includes('catégor') || h.includes('categor'));
-    const sousCatIdx = headers.findIndex(h => h.includes('sous'));
-    const soldeIdx = headers.findIndex(h => h.includes('solde'));
+    // Map columns by exact name
+    const colMap: Record<string, number> = {};
+    headers.forEach((h, idx) => {
+      colMap[h] = idx;
+    });
     
-    console.log('Header indices:', { dateIdx, libelleIdx, noteIdx, montantIdx, categorieIdx, sousCatIdx, soldeIdx });
-    console.log('Headers:', headers);
+    // Find column indices - exact match preferred
+    const dateIdx = colMap['date'] ?? headers.findIndex(h => h === 'date');
+    const libelleIdx = colMap['libellé'] ?? colMap['libelle'] ?? headers.findIndex(h => h.includes('libell'));
+    const noteIdx = colMap['note personnelle'] ?? headers.findIndex(h => h.includes('note'));
+    const montantIdx = colMap['montant'] ?? headers.findIndex(h => h.includes('montant'));
+    const categorieIdx = colMap['catégorie'] ?? colMap['categorie'] ?? headers.findIndex(h => h.includes('categor'));
+    const sousCatIdx = colMap['sous-catégorie'] ?? colMap['sous categorie'] ?? headers.findIndex(h => h.includes('sous'));
+    const soldeIdx = colMap['solde'] ?? headers.findIndex(h => h.includes('solde'));
+    
+    console.log('Headers found:', headers);
+    console.log('Column map:', colMap);
+    console.log('Column indices:', { dateIdx, libelleIdx, noteIdx, montantIdx, categorieIdx, sousCatIdx, soldeIdx });
     
     // Parse data lines
     const data: any[] = [];
@@ -245,7 +252,7 @@ export async function POST(request: NextRequest) {
         const subcategoryName = sousCatIdx >= 0 && sousCatIdx < row.length ? row[sousCatIdx] : '';
         const balanceStr = soldeIdx >= 0 && soldeIdx < row.length ? row[soldeIdx] : '0';
 
-        console.log(`Row ${i}: date=${dateStr}, libelle=${libelle.substring(0,30)}, cat=${categoryName}`);
+        console.log(`Row ${i}: date=${dateStr}, libelle=${libelle.substring(0,40)}, note=${note}, cat=${categoryName}, sous=${subcategoryName}`);
 
         // Parse date (format: DD/MM/YYYY)
         const dateParts = dateStr.split('/');
