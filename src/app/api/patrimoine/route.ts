@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
           'Action': 0,
           'Immo': 0,
           'Obligations': 0,
-          'Liquidités': 0
+          'Liquidites': 0
         };
 
         for (const row of rows) {
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
           actions: totals['Action'],
           immo: totals['Immo'],
           obligations: totals['Obligations'],
-          liquidites: totals['Liquidités'],
+          liquidites: totals['Liquidites'],
           total,
           evolution: prevTotal > 0 ? evolutionVal : null,
           evolution_percent: prevTotal > 0 ? evolutionPercent : null
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
         'Action': 0,
         'Immo': 0,
         'Obligations': 0,
-        'Liquidités': 0
+        'Liquidites': 0
       };
 
       for (const row of rows) {
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
         'Action': 0,
         'Immo': 0,
         'Obligations': 0,
-        'Liquidités': 0
+        'Liquidites': 0
       };
 
       for (const row of prevYearRows) {
@@ -155,14 +155,14 @@ export async function GET(request: NextRequest) {
           Action: totals['Action'] - prevTotals['Action'],
           Immo: totals['Immo'] - prevTotals['Immo'],
           Obligations: totals['Obligations'] - prevTotals['Obligations'],
-          Liquidités: totals['Liquidités'] - prevTotals['Liquidités'],
+          Liquidites: totals['Liquidites'] - prevTotals['Liquidites'],
           total: total - prevTotal
         },
         evolutionPercent: {
           Action: prevTotals['Action'] > 0 ? ((totals['Action'] - prevTotals['Action']) / prevTotals['Action']) * 100 : null,
           Immo: prevTotals['Immo'] > 0 ? ((totals['Immo'] - prevTotals['Immo']) / prevTotals['Immo']) * 100 : null,
           Obligations: prevTotals['Obligations'] > 0 ? ((totals['Obligations'] - prevTotals['Obligations']) / prevTotals['Obligations']) * 100 : null,
-          Liquidités: prevTotals['Liquidités'] > 0 ? ((totals['Liquidités'] - prevTotals['Liquidités']) / prevTotals['Liquidités']) * 100 : null,
+          Liquidites: prevTotals['Liquidites'] > 0 ? ((totals['Liquidites'] - prevTotals['Liquidites']) / prevTotals['Liquidites']) * 100 : null,
           total: prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null
         }
       };

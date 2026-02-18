@@ -20,28 +20,28 @@ interface SummaryData {
     Action: number;
     Immo: number;
     Obligations: number;
-    Liquidités: number;
+    Liquidites: number;
   };
   total: number;
   prevTotals: {
     Action: number;
     Immo: number;
     Obligations: number;
-    Liquidités: number;
+    Liquidites: number;
   };
   prevTotal: number;
   evolution: {
     Action: number;
     Immo: number;
     Obligations: number;
-    Liquidités: number;
+    Liquidites: number;
     total: number;
   };
   evolutionPercent: {
     Action: number | null;
     Immo: number | null;
     Obligations: number | null;
-    Liquidités: number | null;
+    Liquidites: number | null;
     total: number | null;
   };
 }
@@ -114,17 +114,17 @@ export default function PatrimoinePage() {
     Actions: d.actions,
     Immobilier: d.immo,
     Obligations: d.obligations,
-    Liquidités: d.liquidites
+    Liquidites: d.liquidites
   })).reverse();
 
   const TYPE_LABELS: Record<string, string> = {
     Action: 'Actions',
     Immo: 'Immobilier',
     Obligations: 'Obligations',
-    Liquidités: 'Liquidités'
+    Liquidites: 'Liquidites'
   };
 
-  const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidités'];
+  const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidites'];
 
   return (
     <div>
@@ -180,7 +180,7 @@ export default function PatrimoinePage() {
               <Line type="monotone" dataKey="Actions" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="Immobilier" stroke={COLORS[1]} strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="Obligations" stroke={COLORS[2]} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="Liquidités" stroke={COLORS[3]} strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="Liquidites" stroke={COLORS[3]} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -271,7 +271,7 @@ export default function PatrimoinePage() {
                 <th style={{ textAlign: 'right' }}>Actions</th>
                 <th style={{ textAlign: 'right' }}>Immobilier</th>
                 <th style={{ textAlign: 'right' }}>Obligations</th>
-                <th style={{ textAlign: 'right' }}>Liquidités</th>
+                <th style={{ textAlign: 'right' }}>Liquidites</th>
                 <th style={{ textAlign: 'right' }}>Total</th>
                 <th style={{ textAlign: 'right' }}>Évolution</th>
               </tr>

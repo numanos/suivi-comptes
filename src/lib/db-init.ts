@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS placements (
   id INT AUTO_INCREMENT PRIMARY KEY,
   envelope_id INT NOT NULL,
   name VARCHAR(255) NOT NULL,
-  type_placement ENUM('Action', 'Immo', 'Obligations', 'Liquidités') NOT NULL,
+  type_placement ENUM('Action', 'Immo', 'Obligations', 'Liquidites') NOT NULL,
   year INT NOT NULL,
   valorization DECIMAL(12,2) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

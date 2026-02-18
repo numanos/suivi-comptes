@@ -66,7 +66,7 @@ export interface AnnualSummary {
 export interface Envelope {
   id: number;
   name: string;
-  type: 'Action' | 'Immo' | 'Obligations' | 'Liquidités';
+  type: 'Action' | 'Immo' | 'Obligations' | 'Liquidites';
   placements?: Placement[];
 }
 

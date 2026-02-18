@@ -18,7 +18,7 @@ interface Envelope {
   placements: Placement[];
 }
 
-const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidités'];
+const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidites'];
 
 export default function EnveloppesPage() {
   const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
@@ -200,7 +200,7 @@ export default function EnveloppesPage() {
       case 'Action': return 'badge-primary';
       case 'Immo': return 'badge-success';
       case 'Obligations': return 'badge-warning';
-      case 'Liquidités': return 'badge-danger';
+      case 'Liquidites': return 'badge-danger';
       default: return 'badge-primary';
     }
   };
