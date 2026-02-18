@@ -101,6 +101,8 @@ export default function BudgetPage() {
       });
       const data = await res.json();
 
+      console.log('DryRun response:', data);
+
       if (data.dryRun && data.duplicatesCount > 0) {
         setDuplicateInfo(data);
         setShowDuplicateModal(true);

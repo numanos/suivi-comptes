@@ -282,6 +282,7 @@ export async function POST(request: NextRequest) {
 
     // Dry run - return duplicates info
     if (dryRun) {
+      console.log('DRY RUN - returning duplicates info:', { duplicatesCount: duplicatesInFile.length });
       return NextResponse.json({ 
         dryRun: true, 
         totalRows: data.length,
