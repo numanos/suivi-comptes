@@ -72,7 +72,8 @@ transactions (id, date, libelle, note, amount, category_id, subcategory_id, bala
 import_batches (id, filename, record_count, imported_at)
 
 -- Tables patrimoine
-envelopes (id, name, versements, created_at)
+envelopes (id, name, exclude_from_gains, created_at)
+envelope_versements (id, envelope_id, year, versements, created_at)
 placements (id, envelope_id, name, type_placement, year, valorization, created_at, updated_at)
 ```
 
@@ -107,6 +108,12 @@ c5698c0 Add debug logging for dryRun
 2a24a78 Fix: convert month/year to numbers for comparison
 03cd8ef Fix expenses calculation to exclude savings, add filters for transactions
 e60b0cb Refactor patrimoine: envelopes now have versements, placements have types, new dashboard with evolution charts
+f54996e Add error handling for envelopes API
+243680d Fix NaN calculation for valorization and gain
+da746bf Use Liquidites without accent to avoid encoding issues
+9c25092 Add exclude_from_gains option for envelopes
+e4a3d6b Add button to copy placements from previous year
+cb308ac Refactor: versements par année dans table séparée
 ```
 
 ## Problèmes et corrections effectuées
@@ -139,6 +146,22 @@ e60b0cb Refactor patrimoine: envelopes now have versements, placements have type
 - **Problème:** MySQL retourne month et year comme strings, la comparaison échouait
 - **Solution:** Conversion avec Number() dans le frontend
 
+### 8. Erreur NaN sur le calcul des gains
+- **Problème:** Les valeurs retournées par MySQL n'étaient pas converties en nombres
+- **Solution:** Utilisation de Number() et vérifications null
+
+### 9. Problème d'encodage avec "Liquidités"
+- **Problème:** L'accent était perdu lors de la création de la DB
+- **Solution:** Utilisation de "Liquidites" sans accent
+
+### 10. Versements par année
+- **Problème:** Les versements étaient saisis globalement, pas par année
+- **Solution:** Création d'une table separada envelope_versements pour suivre les versements par année
+
+### 11. Copier placements d'une année à l'autre
+- **Problème:** Devoir recréer tous les placements chaque année
+- **Solution:** Bouton "↻ Année N-1" pour copier les placements de l'année précédente
+
 ## Fonctionnalités implémentées
 
 ### Import CSV
@@ -159,9 +182,11 @@ e60b0cb Refactor patrimoine: envelopes now have versements, placements have type
 
 ### Gestion du patrimoine
 - **Enveloppes** : Conteneurs génériques sans type spécifique
-- **Versements** : Montant total des versements par enveloppe (cumul depuis la création)
-- **Placements** : Produits de placement avec type (Action, Immo, Obligations, Liquidités)
+- **Versements** : Table séparée `envelope_versements` avec les versements par année (cumulatif)
+- **Placements** : Produits de placement avec type (Action, Immo, Obligations, Liquidites)
 - **Valorisation** : Saisie par année pour suivre l'évolution
+- **Exclure du calcul des gains** : Option par enveloppe (pour livrets bancaires)
+- **Copie placements** : Bouton pour copier les placements de l'année N-1 vers l'année N
 - **Dashboard** : 
   - Graphique d'évolution du patrimoine total + par type (courbes)
   - Sélecteur d'année
