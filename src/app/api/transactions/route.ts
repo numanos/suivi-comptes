@@ -158,10 +158,13 @@ function fixEncoding(str: string): string {
 }
 
 async function transactionExists(date: string, libelle: string, amount: number): Promise<boolean> {
+  const trimmedLibelle = libelle.trim();
+  console.log('Checking duplicate:', { date, libelle: trimmedLibelle, amount });
   const result = await query(
     'SELECT id FROM transactions WHERE date = ? AND libelle = ? AND amount = ? LIMIT 1',
-    [date, libelle, amount]
+    [date, trimmedLibelle, amount]
   ) as any[];
+  console.log('Duplicate check result:', result.length > 0);
   return result.length > 0;
 }
 
