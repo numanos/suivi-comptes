@@ -119,15 +119,33 @@ export async function POST(request: NextRequest) {
 
     let text = await file.text();
     
-    // Handle different encodings and line endings
+    // Handle different encodings
     text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     
-    const result = Papa.parse(text, {
+    // Try to detect and fix encoding
+    try {
+      text = new TextDecoder('utf-8', { fatal: false }).decode(new TextEncoder().encode(text));
+    } catch (e) {
+      // Keep original if UTF-8 decode fails
+    }
+    
+    // Try with ; first, then ,
+    let result = Papa.parse(text, {
       header: true,
       delimiter: ';',
       skipEmptyLines: true,
-      transformHeader: (header: string) => header.trim()
+      transformHeader: (header: string) => header.trim().toLowerCase()
     });
+
+    // If no data, try with comma
+    if (result.data.length === 0 || !result.data[0] || Object.keys(result.data[0]).length < 3) {
+      result = Papa.parse(text, {
+        header: true,
+        delimiter: ',',
+        skipEmptyLines: true,
+        transformHeader: (header: string) => header.trim().toLowerCase()
+      });
+    }
 
     if (result.errors.length > 0) {
       console.log('Parse errors:', result.errors);
@@ -137,7 +155,7 @@ export async function POST(request: NextRequest) {
     console.log('Parsed rows:', data.length);
     if (data.length > 0) {
       console.log('First row keys:', Object.keys(data[0]));
-      console.log('First row:', data[0]);
+      console.log('First row sample:', JSON.stringify(data[0]));
     }
     
     const [batchResult] = await connection.query(
@@ -173,16 +191,16 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       try {
-        // Map the columns correctly
-        const dateStr = row['Date'] || row['date'];
-        const libelle = row['Libellé'] || row['Libell\u00e9'] || row['libellé'] || row['Libelle'] || '';
-        const note = row['Note personnelle'] || row['Note'] || '';
-        const amountStr = row['Montant'] || row['montant'] || '0';
-        const categoryName = row['Catégorie'] || row['Cat\u00e9gorie'] || row['catégorie'] || '';
-        const subcategoryName = row['Sous-catégorie'] || row['Sous-cat\u00e9gorie'] || row['sous-catégorie'] || '';
-        const balanceStr = row['Solde'] || row['solde'] || '0';
+        // Map the columns (headers are now lowercase)
+        const dateStr = row['date'] || '';
+        const libelle = row['libellé'] || row['libelle'] || '';
+        const note = row['note personnelle'] || row['note'] || '';
+        const amountStr = row['montant'] || '0';
+        const categoryName = row['catégorie'] || row['categorie'] || '';
+        const subcategoryName = row['sous-catégorie'] || row['sous categorie'] || '';
+        const balanceStr = row['solde'] || '0';
 
-        console.log(`Row ${i}:`, { dateStr, libelle, categoryName, subcategoryName });
+        console.log(`Row ${i}:`, { dateStr, libelle, categoryName });
 
         // Parse date (format: DD/MM/YYYY)
         const dateParts = dateStr?.split('/');
@@ -191,10 +209,12 @@ export async function POST(request: NextRequest) {
           date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
         }
 
-        if (!date || !libelle) {
-          console.log(`Skipping row ${i}: no date or libelle`);
+        if (!date) {
+          console.log(`Skipping row ${i}: no date`);
           continue;
         }
+
+        // Use category as libelle if empty
 
         // Parse amount
         let amount = 0;
@@ -208,8 +228,11 @@ export async function POST(request: NextRequest) {
           balance = parseFloat(balanceClean);
         }
 
+        // Use category as libelle if empty
+        const finalLibelle = libelle || categoryName || 'Transaction sans libellé';
+
         // Check for duplicate
-        if (await transactionExists(date, libelle, amount)) {
+        if (await transactionExists(date, finalLibelle, amount)) {
           skipped++;
           continue;
         }
@@ -249,7 +272,7 @@ export async function POST(request: NextRequest) {
         await connection.query(
           `INSERT INTO transactions (date, libelle, note, amount, category_id, subcategory_id, balance, import_batch_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [date, libelle, note || null, amount, categoryId, subcategoryId || null, balance, batchId]
+          [date, finalLibelle, note || null, amount, categoryId, subcategoryId || null, balance, batchId]
         );
         imported++;
       } catch (rowError: any) {
