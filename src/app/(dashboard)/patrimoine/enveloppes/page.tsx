@@ -17,9 +17,7 @@ interface Envelope {
   name: string;
   exclude_from_gains: boolean;
   year_versements: number;
-  annual_versement: number | null;
-  open_year: number | null;
-  initial_amount: number | null;
+  prev_year_versements: number;
   placements: Placement[];
 }
 
@@ -39,12 +37,10 @@ export default function EnveloppesPage() {
   
   const [newEnvelopeName, setNewEnvelopeName] = useState('');
   const [newEnvelopeVersements, setNewEnvelopeVersements] = useState('');
-  const [newEnvelopeOpenYear, setNewEnvelopeOpenYear] = useState(new Date().getFullYear().toString());
   const [editExcludeFromGains, setEditExcludeFromGains] = useState(false);
   const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
   const [editAnnualVersement, setEditAnnualVersement] = useState('');
-  const [editOpenYear, setEditOpenYear] = useState('');
-  const [editInitialAmount, setEditInitialAmount] = useState('');
+  const [prevYearVersements, setPrevYearVersements] = useState(0);
   
   const [newPlacementName, setNewPlacementName] = useState('');
   const [newPlacementType, setNewPlacementType] = useState('Action');
@@ -113,10 +109,7 @@ export default function EnveloppesPage() {
           name: editingEnvelope.name,
           exclude_from_gains: editExcludeFromGains,
           year: parseInt(year),
-          versements: parseFloat(editEnvelopeVersements) || 0,
-          annual_versement: editAnnualVersement ? parseFloat(editAnnualVersement) : null,
-          open_year: editOpenYear ? parseInt(editOpenYear) : null,
-          initial_amount: editInitialAmount ? parseFloat(editInitialAmount) : 0
+          versements: parseFloat(editEnvelopeVersements) || 0
         })
       });
       setShowEditEnvelope(false);
@@ -408,50 +401,45 @@ export default function EnveloppesPage() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Versements totaux</label>
+                <label className="form-label">Total versé à fin {year}</label>
                 <input
                   type="number"
                   step="0.01"
                   className="form-input"
                   value={editEnvelopeVersements}
-                  onChange={(e) => setEditEnvelopeVersements(e.target.value)}
+                  onChange={(e) => {
+                    setEditEnvelopeVersements(e.target.value);
+                    // Auto-calculate annual: total - prev_year
+                    if (prevYearVersements > 0) {
+                      const annual = parseFloat(e.target.value) - prevYearVersements;
+                      setEditAnnualVersement(annual > 0 ? annual.toString() : '');
+                    }
+                  }}
                 />
-                <small style={{ color: 'var(--text-light)' }}>Versements cumulés depuis l'ouverture</small>
+                <small style={{ color: 'var(--text-light)' }}>Saisissez le total des versements cumulés</small>
               </div>
               <div className="form-group">
-                <label className="form-label">Versement initial</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="form-input"
-                  value={editInitialAmount}
-                  onChange={(e) => setEditInitialAmount(e.target.value)}
-                  placeholder="Montant versé à l'ouverture"
-                />
-                <small style={{ color: 'var(--text-light)' }}>Capital de départ (année d'ouverture)</small>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Versement annuel (optionnel)</label>
+                <label className="form-label">dont versement {year}</label>
                 <input
                   type="number"
                   step="0.01"
                   className="form-input"
                   value={editAnnualVersement}
-                  onChange={(e) => setEditAnnualVersement(e.target.value)}
-                  placeholder="Laissez vide pour utiliser les versements cumulés"
+                  onChange={(e) => {
+                    setEditAnnualVersement(e.target.value);
+                    // Auto-calculate total: prev_year + annual
+                    if (prevYearVersements > 0 || e.target.value) {
+                      const annual = parseFloat(e.target.value) || 0;
+                      setEditEnvelopeVersements((prevYearVersements + annual).toString());
+                    }
+                  }}
+                  placeholder={prevYearVersements > 0 ? `Calculé: ${prevYearVersements} + ..." : "Laissez vide"}
                 />
-                <small style={{ color: 'var(--text-light)' }}>Si renseigné, remplace le calcul des versements cumulés pour le gain</small>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Année d'ouverture</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  value={editOpenYear}
-                  onChange={(e) => setEditOpenYear(e.target.value)}
-                  placeholder="Ex: 2020"
-                />
-                <small style={{ color: 'var(--text-light)' }}>Nécessaire pour calculer le total des versements avec le versement annuel</small>
+                <small style={{ color: 'var(--text-light)' }}>
+                  {prevYearVersements > 0 
+                    ? `Sera ajouté au ${formatAmount(prevYearVersements)} de l'année précédente`
+                    : 'Année d\'ouverture = total'}
+                </small>
               </div>
               <div className="form-group">
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -576,24 +564,7 @@ export default function EnveloppesPage() {
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {envelopes.map((envelope) => {
             const totalValorization = envelope.placements.reduce((sum, p) => sum + (Number(p.valorization) || 0), 0);
-            const currentYear = parseInt(year);
-            let versements: number;
-            
-            if (envelope.annual_versement !== null && envelope.annual_versement !== undefined && envelope.open_year !== null && envelope.open_year !== undefined) {
-              // Calculate total versements based on annual contribution since open year + initial amount
-              // Formula: Initial + (Annual * (current - open))
-              // If current == open, it's just Initial.
-              // Wait, user example: 2023 open (6000 initial). 2024 (150 annual).
-              // 2023: 6000 + 150*0 = 6000.
-              // 2024: 6000 + 150*1 = 6150.
-              
-              const yearsCount = Math.max(0, currentYear - envelope.open_year);
-              versements = (Number(envelope.initial_amount) || 0) + (envelope.annual_versement * yearsCount);
-            } else {
-              // Use cumulative versements
-              versements = Number(envelope.year_versements) || 0;
-            }
-            
+            const versements = Number(envelope.year_versements) || 0;
             const gain = envelope.exclude_from_gains ? null : totalValorization - versements;
             
             return (
@@ -603,11 +574,6 @@ export default function EnveloppesPage() {
                     <h2 className="card-title">{envelope.name}</h2>
                     <span className="badge badge-secondary">
                       {formatAmount(versements)} versés
-                      {envelope.annual_versement !== null && envelope.annual_versement !== undefined && envelope.open_year !== null && (
-                        <span style={{ fontSize: '0.75rem', marginLeft: '0.25rem' }}>
-                          ({formatAmount(envelope.initial_amount || 0)} + {formatAmount(envelope.annual_versement)}/an × {Math.max(0, currentYear - envelope.open_year)} ans)
-                        </span>
-                      )}
                     </span>
                     {envelope.exclude_from_gains && <span className="badge badge-warning">Gain désactivé</span>}
                   </div>
@@ -617,9 +583,10 @@ export default function EnveloppesPage() {
                       onClick={() => {
                         setEditingEnvelope(envelope);
                         setEditEnvelopeVersements(envelope.year_versements?.toString() || '0');
-                        setEditAnnualVersement(envelope.annual_versement?.toString() || '');
-                        setEditOpenYear(envelope.open_year?.toString() || '');
-                        setEditInitialAmount(envelope.initial_amount?.toString() || '');
+                        setPrevYearVersements(envelope.prev_year_versements || 0);
+                        // Calculate annual: current total - previous total
+                        const annual = (envelope.year_versements || 0) - (envelope.prev_year_versements || 0);
+                        setEditAnnualVersement(annual > 0 ? annual.toString() : '');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}
