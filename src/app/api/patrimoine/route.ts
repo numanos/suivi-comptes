@@ -76,13 +76,16 @@ export async function GET(request: NextRequest) {
       let historicalTotals: any[] = [];
       try {
         historicalTotals = await query('SELECT * FROM historical_totals') as any[];
+        console.log('Historical totals from DB:', historicalTotals);
       } catch (error: any) {
         // Table doesn't exist, skip historical data
         if (error.code !== 'ER_NO_SUCH_TABLE') {
           throw error;
         }
+        console.log('historical_totals table does not exist');
       }
       const historicalMap = new Map(historicalTotals.map(h => [h.year, h.total]));
+      console.log('Historical map:', Array.from(historicalMap.entries()));
 
       const allYears = new Set([...years.map(y => y.year), ...historicalTotals.map(h => h.year)]);
       const sortedYears = Array.from(allYears).sort((a, b) => b - a);
@@ -158,6 +161,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
+      console.log('Evolution data to return:', evolution);
       return NextResponse.json(evolution);
     }
 

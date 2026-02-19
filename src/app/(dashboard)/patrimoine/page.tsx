@@ -77,6 +77,9 @@ export default function PatrimoinePage() {
       const evolution = await evolutionRes.json();
       const summary = await summaryRes.json();
       
+      console.log('Evolution data:', evolution);
+      console.log('Historical entries:', evolution.filter((d: any) => d.isHistorical));
+      
       setEvolutionData(evolution);
       setSummaryData(summary);
     } catch (error) {
@@ -180,7 +183,9 @@ export default function PatrimoinePage() {
             + Ajouter
           </button>
         </div>
-        {evolutionData.filter(d => d.isHistorical).length > 0 && (
+        {evolutionData.filter(d => d.isHistorical).length === 0 ? (
+          <p style={{ padding: '1rem', color: 'var(--text-light)' }}>Aucun historique pré-diversification enregistré</p>
+        ) : (
           <div className="table-container">
             <table className="table">
               <thead>
