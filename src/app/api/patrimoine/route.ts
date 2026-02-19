@@ -11,57 +11,34 @@ export async function GET(request: NextRequest) {
       const targetYear = parseInt(year || new Date().getFullYear().toString());
       const prevYear = targetYear - 1;
       
-      // Try query with all columns, fallback to queries without new columns
+      // Simple query that works regardless of schema, uses subqueries for prev year
       let envelopes: any[];
       try {
         envelopes = await query(`
-          SELECT e.id, e.name, e.exclude_from_gains, e.closed_year, e.annual_versement, e.open_year, e.initial_amount,
+          SELECT e.id, e.name, e.exclude_from_gains,
                  ev.versements as year_versements,
-                 ev_prev.versements as prev_year_versements,
+                 (SELECT SUM(ev2.versements) FROM envelope_versements ev2 WHERE ev2.envelope_id = e.id AND ev2.year < ?) as prev_year_versements,
                  p.id as placement_id, p.name as placement_name, 
                  p.type_placement, p.year, p.valorization
           FROM envelopes e
           LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-          LEFT JOIN envelope_versements ev_prev ON ev_prev.envelope_id = e.id AND ev_prev.year = ?
           LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-          WHERE e.closed_year IS NULL OR e.closed_year > ?
           ORDER BY e.name
-        `, [targetYear, prevYear, targetYear, targetYear]) as any[];
+        `, [targetYear, targetYear, targetYear]) as any[];
       } catch (error: any) {
-        // ... existing fallback code ...
-        console.error("Query failed with full columns, check DB schema", error);
-        
-        // Simplified fallback for just getting the envelopes if schema mismatch
-        if (error.code === 'ER_BAD_FIELD_ERROR') {
-          try {
-             // Fallback to basic query without prev_year join if it fails (simplified for robustness)
-             envelopes = await query(`
-              SELECT e.id, e.name, e.exclude_from_gains, e.closed_year,
-                     ev.versements as year_versements,
-                     p.id as placement_id, p.name as placement_name, 
-                     p.type_placement, p.year, p.valorization
-              FROM envelopes e
-              LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-              LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-              WHERE e.closed_year IS NULL OR e.closed_year > ?
-              ORDER BY e.name
-            `, [targetYear, targetYear, targetYear]) as any[];
-          } catch (e) {
-             // Ultimate fallback
-             envelopes = await query(`
-              SELECT e.id, e.name, e.exclude_from_gains,
-                     ev.versements as year_versements,
-                     p.id as placement_id, p.name as placement_name, 
-                     p.type_placement, p.year, p.valorization
-              FROM envelopes e
-              LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-              LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-              ORDER BY e.name
-            `, [targetYear, targetYear]) as any[];
-          }
-        } else {
-            throw error;
-        }
+        console.error("Query failed:", error.message);
+        // Ultra simple fallback
+        envelopes = await query(`
+          SELECT e.id, e.name, e.exclude_from_gains,
+                 ev.versements as year_versements,
+                 0 as prev_year_versements,
+                 p.id as placement_id, p.name as placement_name, 
+                 p.type_placement, p.year, p.valorization
+          FROM envelopes e
+          LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
+          LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+          ORDER BY e.name
+        `, [targetYear, targetYear]) as any[];
       }
 
       const envelopeMap = new Map();
@@ -73,9 +50,6 @@ export async function GET(request: NextRequest) {
             exclude_from_gains: Boolean(row.exclude_from_gains),
             year_versements: row.year_versements || 0,
             prev_year_versements: row.prev_year_versements || 0,
-            annual_versement: row.annual_versement,
-            open_year: row.open_year,
-            initial_amount: row.initial_amount || 0,
             placements: []
           });
         }
