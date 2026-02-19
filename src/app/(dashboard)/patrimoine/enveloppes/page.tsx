@@ -567,8 +567,8 @@ export default function EnveloppesPage() {
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {envelopes.map((envelope) => {
             const totalValorization = envelope.placements.reduce((sum, p) => sum + (Number(p.valorization) || 0), 0);
-            const versements = Number(envelope.year_versements) || 0;
-            const gain = envelope.exclude_from_gains ? null : totalValorization - versements;
+            const cumulativeVersements = (Number(envelope.prev_year_versements) || 0) + (Number(envelope.year_versements) || 0);
+            const gain = envelope.exclude_from_gains ? null : totalValorization - cumulativeVersements;
             
             return (
               <div key={envelope.id} className="card">
@@ -576,7 +576,7 @@ export default function EnveloppesPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <h2 className="card-title">{envelope.name}</h2>
                     <span className="badge badge-secondary">
-                      {formatAmount(versements)} versés
+                      {formatAmount(cumulativeVersements)} versés
                     </span>
                     {envelope.exclude_from_gains && <span className="badge badge-warning">Gain désactivé</span>}
                   </div>
@@ -585,17 +585,14 @@ export default function EnveloppesPage() {
                       className="btn btn-secondary"
                       onClick={() => {
                         setEditingEnvelope(envelope);
-                        const currentYearVersements = Number(envelope.year_versements) || 0;
                         const prevVersements = Number(envelope.prev_year_versements) || 0;
-                        // If no entry for current year, use previous year's total as current
-                        const displayTotal = currentYearVersements > 0 || envelope.year_versements === 0 
-                          ? currentYearVersements 
-                          : prevVersements;
-                        setEditEnvelopeVersements(String(displayTotal));
+                        const annualAmount = Number(envelope.year_versements) || 0;
+                        // Cumulative total = sum of all years up to current (prev + current annual)
+                        const cumulativeTotal = prevVersements + annualAmount;
+                        setEditEnvelopeVersements(String(cumulativeTotal));
                         setPrevYearVersements(prevVersements);
-                        // Calculate annual: display total - previous total
-                        const annual = displayTotal - prevVersements;
-                        setEditAnnualVersement(annual !== 0 || displayTotal > 0 ? annual.toString() : '');
+                        // Annual is the amount stored for current year (if any)
+                        setEditAnnualVersement(annualAmount !== 0 ? annualAmount.toString() : '');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}
@@ -649,7 +646,7 @@ export default function EnveloppesPage() {
                       ) : (
                         <span style={{ marginLeft: '1rem' }}>
                           Gain: <span className={gain !== null && gain >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                            {gain !== null ? formatAmount(gain) : '-'} ({versements > 0 ? (gain! / versements * 100).toFixed(1) : '0'}%)
+                            {gain !== null ? formatAmount(gain) : '-'} ({cumulativeVersements > 0 ? (gain! / cumulativeVersements * 100).toFixed(1) : '0'}%)
                           </span>
                         </span>
                       )}
