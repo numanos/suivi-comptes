@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
             id: row.id,
             name: row.name,
             exclude_from_gains: Boolean(row.exclude_from_gains),
-            year_versements: row.year_versements || 0,
-            prev_year_versements: row.prev_year_versements || 0,
+            year_versements: Number(row.year_versements) || 0,
+            prev_year_versements: Number(row.prev_year_versements) || 0,
             placements: []
           });
         }

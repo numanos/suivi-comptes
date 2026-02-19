@@ -580,10 +580,10 @@ export default function EnveloppesPage() {
                       className="btn btn-secondary"
                       onClick={() => {
                         setEditingEnvelope(envelope);
-                        setEditEnvelopeVersements(envelope.year_versements?.toString() || '0');
-                        setPrevYearVersements(envelope.prev_year_versements || 0);
+                        setEditEnvelopeVersements(String(envelope.year_versements || 0));
+                        setPrevYearVersements(Number(envelope.prev_year_versements) || 0);
                         // Calculate annual: current total - previous total
-                        const annual = (envelope.year_versements || 0) - (envelope.prev_year_versements || 0);
+                        const annual = (Number(envelope.year_versements) || 0) - (Number(envelope.prev_year_versements) || 0);
                         setEditAnnualVersement(annual > 0 ? annual.toString() : '');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
