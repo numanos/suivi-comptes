@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS placements (
 const indexes = [
   { name: 'idx_transactions_date', sql: 'CREATE INDEX idx_transactions_date ON transactions(date)' },
   { name: 'idx_transactions_category', sql: 'CREATE INDEX idx_transactions_category ON transactions(category_id)' },
-  { name: 'idx_transactions_month', sql: 'CREATE INDEX idx_transactions_month ON transactions(YEAR(date), MONTH(date))' },
+  // Note: idx_transactions_month removed - MariaDB doesn't support functional indexes like MySQL 8.0
   { name: 'idx_placements_year', sql: 'CREATE INDEX idx_placements_year ON placements(year)' },
   { name: 'idx_placements_envelope', sql: 'CREATE INDEX idx_placements_envelope ON placements(envelope_id, year)' }
 ];
@@ -134,6 +134,8 @@ async function createIndexes(connection: any) {
     } catch (error: any) {
       if (error.code === 'ER_DUP_KEYNAME') {
         console.log(`Index ${idx.name} already exists, skipping`);
+      } else if (error.code === 'ER_PARSE_ERROR') {
+        console.log(`Index ${idx.name} has syntax error (may not be compatible with this MySQL/MariaDB version), skipping`);
       } else {
         throw error;
       }
