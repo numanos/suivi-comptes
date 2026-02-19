@@ -37,6 +37,7 @@ export default function RecapPage() {
   }, []);
 
   const formatAmount = (amount: number) => {
+    if (typeof amount !== 'number' || isNaN(amount)) return '0,00 €';
     return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
   };
 
@@ -44,18 +45,21 @@ export default function RecapPage() {
     return <div>Chargement...</div>;
   }
 
-  const chartData = monthlyData.map(d => ({
+  // Ensure monthlyData is an array
+  const safeMonthlyData = Array.isArray(monthlyData) ? monthlyData : [];
+
+  const chartData = safeMonthlyData.map(d => ({
     name: monthNames[d.month - 1],
-    Dépenses: d.total_expenses,
-    Revenus: d.total_income,
-    Épargne: d.total_savings,
+    Dépenses: Number(d.total_expenses) || 0,
+    Revenus: Number(d.total_income) || 0,
+    Épargne: Number(d.total_savings) || 0,
     Solde: d.balance
   }));
 
   // Calculate YTD totals for current year
-  const ytdExpenses = monthlyData.reduce((sum, d) => sum + d.total_expenses, 0);
-  const ytdIncome = monthlyData.reduce((sum, d) => sum + d.total_income, 0);
-  const ytdSavings = monthlyData.reduce((sum, d) => sum + d.total_savings, 0);
+  const ytdExpenses = safeMonthlyData.reduce((sum, d) => sum + (Number(d.total_expenses) || 0), 0);
+  const ytdIncome = safeMonthlyData.reduce((sum, d) => sum + (Number(d.total_income) || 0), 0);
+  const ytdSavings = safeMonthlyData.reduce((sum, d) => sum + (Number(d.total_savings) || 0), 0);
 
   // Previous year data
   const prevYearData = data.find(d => d.year === currentYear - 1);

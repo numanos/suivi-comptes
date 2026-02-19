@@ -42,17 +42,18 @@ export default function DashboardPage() {
   console.log('Dashboard data:', data);
   const currentData = data.find(d => Number(d.month) === currentMonth && Number(d.year) === currentYear);
   console.log('Current data found:', currentData);
-  const ytdData = data.filter(d => d.year === currentYear);
+  const safeData = Array.isArray(data) ? data : [];
+  const ytdData = safeData.filter(d => d.year === currentYear);
 
-  const ytdExpenses = ytdData.reduce((sum, d) => sum + d.total_expenses, 0);
-  const ytdIncome = ytdData.reduce((sum, d) => sum + d.total_income, 0);
-  const ytdSavings = ytdData.reduce((sum, d) => sum + d.total_savings, 0);
+  const ytdExpenses = ytdData.reduce((sum, d) => sum + (Number(d.total_expenses) || 0), 0);
+  const ytdIncome = ytdData.reduce((sum, d) => sum + (Number(d.total_income) || 0), 0);
+  const ytdSavings = ytdData.reduce((sum, d) => sum + (Number(d.total_savings) || 0), 0);
 
-  const chartData = data.map(d => ({
+  const chartData = safeData.map(d => ({
     name: monthNames[d.month - 1],
-    Dépenses: d.total_expenses,
-    Revenus: d.total_income,
-    Épargne: d.total_savings
+    Dépenses: Number(d.total_expenses) || 0,
+    Revenus: Number(d.total_income) || 0,
+    Épargne: Number(d.total_savings) || 0
   }));
 
   if (loading) {
