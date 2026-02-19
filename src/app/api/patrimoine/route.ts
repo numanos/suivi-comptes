@@ -390,11 +390,17 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    if (year && versements !== undefined) {
+    if (year && versements !== undefined && versements !== null) {
       await query(
         `INSERT INTO envelope_versements (envelope_id, year, versements) VALUES (?, ?, ?)
          ON DUPLICATE KEY UPDATE versements = ?`,
         [id, year, versements, versements]
+      );
+    } else if (year && versements === null) {
+      // If versements is null, delete the row for this year
+      await query(
+        `DELETE FROM envelope_versements WHERE envelope_id = ? AND year = ?`,
+        [id, year]
       );
     }
 

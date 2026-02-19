@@ -100,6 +100,9 @@ export default function EnveloppesPage() {
     e.preventDefault();
     if (!editingEnvelope) return;
 
+    // If annual versements field is empty, don't update versements
+    const annualVersement = editAnnualVersement.trim() === '' ? null : parseFloat(editAnnualVersement);
+
     try {
       await fetch('/api/patrimoine', {
         method: 'PUT',
@@ -109,7 +112,7 @@ export default function EnveloppesPage() {
           name: editingEnvelope.name,
           exclude_from_gains: editExcludeFromGains,
           year: parseInt(year),
-          versements: parseFloat(editAnnualVersement) || 0
+          versements: annualVersement
         })
       });
       setShowEditEnvelope(false);
@@ -408,11 +411,12 @@ export default function EnveloppesPage() {
                   className="form-input"
                   value={editEnvelopeVersements}
                   onChange={(e) => {
-                    const totalValue = parseFloat(e.target.value) || 0;
-                    setEditEnvelopeVersements(e.target.value);
+                    const val = e.target.value;
+                    setEditEnvelopeVersements(val);
                     // Auto-calculate annual: total - prev_year
+                    const totalValue = val === '' ? 0 : (parseFloat(val) || 0);
                     const annual = totalValue - prevYearVersements;
-                    setEditAnnualVersement(annual >= 0 ? annual.toString() : '0');
+                    setEditAnnualVersement(annual >= 0 ? annual.toString() : '');
                   }}
                 />
                 <small style={{ color: 'var(--text-light)' }}>Saisissez le total des versements cumulés</small>
@@ -425,9 +429,10 @@ export default function EnveloppesPage() {
                   className="form-input"
                   value={editAnnualVersement}
                   onChange={(e) => {
-                    const annualValue = parseFloat(e.target.value) || 0;
-                    setEditAnnualVersement(e.target.value);
+                    const val = e.target.value;
+                    setEditAnnualVersement(val);
                     // Auto-calculate total: prev_year + annual
+                    const annualValue = val === '' ? 0 : (parseFloat(val) || 0);
                     const newTotal = prevYearVersements + annualValue;
                     setEditEnvelopeVersements(newTotal.toString());
                   }}
@@ -580,11 +585,17 @@ export default function EnveloppesPage() {
                       className="btn btn-secondary"
                       onClick={() => {
                         setEditingEnvelope(envelope);
-                        setEditEnvelopeVersements(String(envelope.year_versements || 0));
-                        setPrevYearVersements(Number(envelope.prev_year_versements) || 0);
-                        // Calculate annual: current total - previous total
-                        const annual = (Number(envelope.year_versements) || 0) - (Number(envelope.prev_year_versements) || 0);
-                        setEditAnnualVersement(annual > 0 ? annual.toString() : '');
+                        const currentYearVersements = Number(envelope.year_versements) || 0;
+                        const prevVersements = Number(envelope.prev_year_versements) || 0;
+                        // If no entry for current year, use previous year's total as current
+                        const displayTotal = currentYearVersements > 0 || envelope.year_versements === 0 
+                          ? currentYearVersements 
+                          : prevVersements;
+                        setEditEnvelopeVersements(String(displayTotal));
+                        setPrevYearVersements(prevVersements);
+                        // Calculate annual: display total - previous total
+                        const annual = displayTotal - prevVersements;
+                        setEditAnnualVersement(annual !== 0 || displayTotal > 0 ? annual.toString() : '');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}
