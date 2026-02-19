@@ -120,9 +120,50 @@ export default function PatrimoinePage() {
   const latestData = evolutionData[0];
   const previousData = evolutionData[1];
 
+  // Calculate projected data (N-1 + 5% + 12 000€ annual)
+  const calculateProjectedData = () => {
+    if (evolutionData.length === 0) return [];
+    
+    // Sort by year ascending
+    const sortedData = [...evolutionData].sort((a, b) => a.year - b.year);
+    const projected: { year: number; value: number }[] = [];
+    
+    // Find first year with data
+    let baseValue: number | null = null;
+    let startYear: number | null = null;
+    
+    for (const d of sortedData) {
+      if (d.total > 0) {
+        baseValue = d.total;
+        startYear = d.year;
+        break;
+      }
+    }
+    
+    if (!baseValue || !startYear) return [];
+    
+    // Calculate projection for each year from start to max year
+    const maxYear = Math.max(...sortedData.map(d => d.year));
+    let currentValue = baseValue;
+    
+    for (let yr = startYear; yr <= maxYear; yr++) {
+      if (yr === startYear) {
+        projected.push({ year: yr, value: currentValue });
+      } else {
+        currentValue = currentValue * 1.05 + 12000;
+        projected.push({ year: yr, value: currentValue });
+      }
+    }
+    
+    return projected;
+  };
+
+  const projectedData = calculateProjectedData();
+
   const chartData = evolutionData.map(d => ({
     year: d.year,
     Total: d.total,
+    Projected: projectedData.find(p => p.year === d.year)?.value || null,
     Actions: d.actions,
     Immobilier: d.immo,
     Obligations: d.obligations,
@@ -310,6 +351,7 @@ export default function PatrimoinePage() {
               <Area type="monotone" dataKey="Immobilier" stackId="1" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Actions" stackId="1" stroke={COLORS[0]} fill={COLORS[0]} fillOpacity={0.6} />
               <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={{ r: 5, fill: '#000' }} activeDot={{ r: 8 }} />
+              <Line type="monotone" dataKey="Projected" stroke="#dc2626" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 4, fill: '#dc2626' }} name="Prévisionnel (5% + 12k€/an)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
