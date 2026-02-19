@@ -8,7 +8,8 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
 
     if (type === 'envelopes') {
-      const targetYear = year || new Date().getFullYear();
+      const targetYear = parseInt(year || new Date().getFullYear().toString());
+      const prevYear = targetYear - 1;
       
       // Try query with all columns, fallback to queries without new columns
       let envelopes: any[];
@@ -21,11 +22,11 @@ export async function GET(request: NextRequest) {
                  p.type_placement, p.year, p.valorization
           FROM envelopes e
           LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-          LEFT JOIN envelope_versements ev_prev ON ev_prev.envelope_id = e.id AND ev_prev.year = ? - 1
+          LEFT JOIN envelope_versements ev_prev ON ev_prev.envelope_id = e.id AND ev_prev.year = ?
           LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
           WHERE e.closed_year IS NULL OR e.closed_year > ?
           ORDER BY e.name
-        `, [targetYear, targetYear, targetYear, targetYear]) as any[];
+        `, [targetYear, prevYear, targetYear, targetYear]) as any[];
       } catch (error: any) {
         // ... existing fallback code ...
         console.error("Query failed with full columns, check DB schema", error);
