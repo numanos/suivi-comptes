@@ -331,7 +331,7 @@ export default function EnveloppesPage() {
                     cy="50%"
                     outerRadius={90}
                     label={({ name, percent }) => `${percent.toFixed(1)}%`}
-                    labelLine={{ stroke: '#666', strokeWidth: 1, length: 15, length2: 10 }}
+                    labelLine={{ stroke: '#666', strokeWidth: 1 }}
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
