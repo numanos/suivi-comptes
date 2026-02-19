@@ -48,7 +48,24 @@ export default function BudgetPage() {
   const [editSubcategoryId, setEditSubcategoryId] = useState<number | null>(null);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<any>(null);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [pagination, setPagination] = useState({ total: 0, limit: 50, offset: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchYears = async () => {
+    try {
+      const res = await fetch('/api/transactions?getYears=true');
+      const data = await res.json();
+      if (data.years && data.years.length > 0) {
+        setAvailableYears(data.years);
+        if (!data.years.includes(parseInt(year))) {
+          setYear(data.years[0].toString());
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -59,10 +76,15 @@ export default function BudgetPage() {
       if (filterLibelle) params.set('libelle', filterLibelle);
       if (filterCategory) params.set('category', filterCategory);
       if (filterSubcategory) params.set('subcategory', filterSubcategory);
+      params.set('limit', pagination.limit.toString());
+      params.set('offset', pagination.offset.toString());
       
       const res = await fetch(`/api/transactions?${params}`);
       const data = await res.json();
       setTransactions(data.transactions || data || []);
+      if (data.total !== undefined) {
+        setPagination(prev => ({ ...prev, total: data.total }));
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -81,15 +103,13 @@ export default function BudgetPage() {
   };
 
   useEffect(() => {
-    fetchTransactions();
+    fetchYears();
     fetchCategories();
   }, []);
 
   useEffect(() => {
-    if (!filterLibelle && !filterCategory && !filterSubcategory) {
-      fetchTransactions();
-    }
-  }, [filterLibelle, filterCategory, filterSubcategory]);
+    fetchTransactions();
+  }, [year, month, pagination.offset, pagination.limit]);
 
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,15 +315,17 @@ export default function BudgetPage() {
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Année</label>
-            <select className="form-select" value={year} onChange={(e) => setYear(e.target.value)}>
-              {[2024, 2025, 2026, 2027].map(y => (
+            <select className="form-select" value={year} onChange={(e) => { setYear(e.target.value); setPagination(p => ({ ...p, offset: 0 })); }}>
+              {availableYears.length > 0 ? availableYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              )) : [2024, 2025, 2026, 2027].map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Mois</label>
-            <select className="form-select" value={month} onChange={(e) => setMonth(e.target.value)}>
+            <select className="form-select" value={month} onChange={(e) => { setMonth(e.target.value); setPagination(p => ({ ...p, offset: 0 })); }}>
               <option value="">Tous</option>
               {['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'].map((m, i) => (
                 <option key={i + 1} value={i + 1}>{m}</option>
@@ -344,6 +366,7 @@ export default function BudgetPage() {
               setFilterLibelle('');
               setFilterCategory('');
               setFilterSubcategory('');
+              setPagination(p => ({ ...p, offset: 0 }));
             }}>
               Effacer filtres
             </button>
@@ -362,72 +385,98 @@ export default function BudgetPage() {
             <p>Aucune transaction trouvée</p>
           </div>
         ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th style={{ width: '40px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={selectedIds.length === transactions.length && transactions.length > 0}
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
-                  <th>Date</th>
-                  <th>Libellé</th>
-                  <th>Catégorie</th>
-                  <th>Sous-catégorie</th>
-                  <th style={{ textAlign: 'right' }}>Montant</th>
-                  <th style={{ textAlign: 'right' }}>Solde</th>
-                  <th style={{ width: '150px' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((t) => (
-                  <tr key={t.id}>
-                    <td>
+          <>
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '40px' }}>
                       <input 
                         type="checkbox" 
-                        checked={selectedIds.includes(t.id)}
-                        onChange={() => toggleSelect(t.id)}
+                        checked={selectedIds.length === transactions.length && transactions.length > 0}
+                        onChange={toggleSelectAll}
                       />
-                    </td>
-                    <td>{formatDate(t.date)}</td>
-                    <td>
-                      <div>{t.libelle}</div>
-                      {t.note && <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>{t.note}</div>}
-                    </td>
-                    <td>{t.category_name || '-'}</td>
-                    <td>{t.subcategory_name || '-'}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      <span className={t.amount >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                        {formatAmount(t.amount)}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: 500 }}>{t.balance !== null ? formatAmount(t.balance) : '-'}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <button 
-                          className="btn btn-secondary" 
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                          onClick={() => handleEdit(t)}
-                        >
-                          Modifier
-                        </button>
-                        <button 
-                          className="btn btn-danger" 
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                          onClick={() => handleDelete(t.id)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </td>
+                    </th>
+                    <th>Date</th>
+                    <th>Libellé</th>
+                    <th>Catégorie</th>
+                    <th>Sous-catégorie</th>
+                    <th style={{ textAlign: 'right' }}>Montant</th>
+                    <th style={{ textAlign: 'right' }}>Solde</th>
+                    <th style={{ width: '150px' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {transactions.map((t) => (
+                    <tr key={t.id}>
+                      <td>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedIds.includes(t.id)}
+                          onChange={() => toggleSelect(t.id)}
+                        />
+                      </td>
+                      <td>{formatDate(t.date)}</td>
+                      <td>
+                        <div>{t.libelle}</div>
+                        {t.note && <div style={{ fontSize: '0.75rem', color: 'var(--text-light)' }}>{t.note}</div>}
+                      </td>
+                      <td>{t.category_name || '-'}</td>
+                      <td>{t.subcategory_name || '-'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <span className={t.amount >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                          {formatAmount(t.amount)}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 500 }}>{t.balance !== null ? formatAmount(t.balance) : '-'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.25rem' }}>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                            onClick={() => handleEdit(t)}
+                          >
+                            Modifier
+                          </button>
+                          <button 
+                            className="btn btn-danger" 
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                            onClick={() => handleDelete(t.id)}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {pagination.total > pagination.limit ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', padding: '0.5rem' }}>
+                <div style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                  Affichage de {pagination.offset + 1} à {Math.min(pagination.offset + pagination.limit, pagination.total)} sur {pagination.total} transactions
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setPagination(p => ({ ...p, offset: Math.max(0, p.offset - p.limit) }))}
+                    disabled={pagination.offset === 0}
+                  >
+                    Précédent
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setPagination(p => ({ ...p, offset: p.offset + p.limit }))}
+                    disabled={pagination.offset + pagination.limit >= pagination.total}
+                  >
+                    Suivant
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 
