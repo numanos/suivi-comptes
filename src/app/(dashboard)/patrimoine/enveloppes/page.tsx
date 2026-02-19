@@ -18,6 +18,7 @@ interface Envelope {
   exclude_from_gains: boolean;
   year_versements: number;
   annual_versement: number | null;
+  open_year: number | null;
   placements: Placement[];
 }
 
@@ -37,9 +38,11 @@ export default function EnveloppesPage() {
   
   const [newEnvelopeName, setNewEnvelopeName] = useState('');
   const [newEnvelopeVersements, setNewEnvelopeVersements] = useState('');
+  const [newEnvelopeOpenYear, setNewEnvelopeOpenYear] = useState(new Date().getFullYear().toString());
   const [editExcludeFromGains, setEditExcludeFromGains] = useState(false);
   const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
   const [editAnnualVersement, setEditAnnualVersement] = useState('');
+  const [editOpenYear, setEditOpenYear] = useState('');
   
   const [newPlacementName, setNewPlacementName] = useState('');
   const [newPlacementType, setNewPlacementType] = useState('Action');
@@ -109,7 +112,8 @@ export default function EnveloppesPage() {
           exclude_from_gains: editExcludeFromGains,
           year: parseInt(year),
           versements: parseFloat(editEnvelopeVersements) || 0,
-          annual_versement: editAnnualVersement ? parseFloat(editAnnualVersement) : null
+          annual_versement: editAnnualVersement ? parseFloat(editAnnualVersement) : null,
+          open_year: editOpenYear ? parseInt(editOpenYear) : null
         })
       });
       setShowEditEnvelope(false);
@@ -316,19 +320,19 @@ export default function EnveloppesPage() {
           <div className="card-header">
             <h2 className="card-title">Répartition du patrimoine {year}</h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem', padding: '1rem' }}>
-            <div style={{ width: 500, height: 350 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ width: 600, height: 400 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     dataKey="value"
                     nameKey="name"
-                    cx="35%"
+                    cx="40%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius={90}
                     label={({ name, percent }) => `${percent.toFixed(1)}%`}
-                    labelLine={{ stroke: '#666', strokeWidth: 1 }}
+                    labelLine={{ stroke: '#666', strokeWidth: 1, length: 15, length2: 10 }}
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
@@ -422,6 +426,17 @@ export default function EnveloppesPage() {
                   placeholder="Laissez vide pour utiliser les versements cumulés"
                 />
                 <small style={{ color: 'var(--text-light)' }}>Si renseigné, remplace le calcul des versements cumulés pour le gain</small>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Année d'ouverture</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={editOpenYear}
+                  onChange={(e) => setEditOpenYear(e.target.value)}
+                  placeholder="Ex: 2020"
+                />
+                <small style={{ color: 'var(--text-light)' }}>Nécessaire pour calculer le total des versements avec le versement annuel</small>
               </div>
               <div className="form-group">
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -546,9 +561,18 @@ export default function EnveloppesPage() {
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {envelopes.map((envelope) => {
             const totalValorization = envelope.placements.reduce((sum, p) => sum + (Number(p.valorization) || 0), 0);
-            const versements = envelope.annual_versement !== null && envelope.annual_versement !== undefined 
-              ? envelope.annual_versement 
-              : (Number(envelope.year_versements) || 0);
+            const currentYear = parseInt(year);
+            let versements: number;
+            
+            if (envelope.annual_versement !== null && envelope.annual_versement !== undefined && envelope.open_year !== null && envelope.open_year !== undefined) {
+              // Calculate total versements based on annual contribution since open year
+              const yearsCount = currentYear - envelope.open_year + 1;
+              versements = envelope.annual_versement * yearsCount;
+            } else {
+              // Use cumulative versements
+              versements = Number(envelope.year_versements) || 0;
+            }
+            
             const gain = envelope.exclude_from_gains ? null : totalValorization - versements;
             
             return (
@@ -558,8 +582,10 @@ export default function EnveloppesPage() {
                     <h2 className="card-title">{envelope.name}</h2>
                     <span className="badge badge-secondary">
                       {formatAmount(versements)} versés
-                      {envelope.annual_versement !== null && envelope.annual_versement !== undefined && (
-                        <span style={{ fontSize: '0.75rem', marginLeft: '0.25rem' }}>(annuel)</span>
+                      {envelope.annual_versement !== null && envelope.annual_versement !== undefined && envelope.open_year !== null && (
+                        <span style={{ fontSize: '0.75rem', marginLeft: '0.25rem' }}>
+                          ({formatAmount(envelope.annual_versement)}/an × {currentYear - envelope.open_year + 1} ans)
+                        </span>
                       )}
                     </span>
                     {envelope.exclude_from_gains && <span className="badge badge-warning">Gain désactivé</span>}
@@ -571,6 +597,7 @@ export default function EnveloppesPage() {
                         setEditingEnvelope(envelope);
                         setEditEnvelopeVersements(envelope.year_versements?.toString() || '0');
                         setEditAnnualVersement(envelope.annual_versement?.toString() || '');
+                        setEditOpenYear(envelope.open_year?.toString() || '');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}

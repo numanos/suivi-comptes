@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS envelopes (
   exclude_from_gains BOOLEAN DEFAULT FALSE,
   closed_year INT DEFAULT NULL,
   annual_versement DECIMAL(12,2) DEFAULT NULL,
+  open_year INT DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
