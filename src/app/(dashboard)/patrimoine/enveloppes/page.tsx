@@ -408,12 +408,11 @@ export default function EnveloppesPage() {
                   className="form-input"
                   value={editEnvelopeVersements}
                   onChange={(e) => {
+                    const totalValue = parseFloat(e.target.value) || 0;
                     setEditEnvelopeVersements(e.target.value);
                     // Auto-calculate annual: total - prev_year
-                    if (prevYearVersements > 0) {
-                      const annual = parseFloat(e.target.value) - prevYearVersements;
-                      setEditAnnualVersement(annual > 0 ? annual.toString() : '');
-                    }
+                    const annual = totalValue - prevYearVersements;
+                    setEditAnnualVersement(annual >= 0 ? annual.toString() : '0');
                   }}
                 />
                 <small style={{ color: 'var(--text-light)' }}>Saisissez le total des versements cumulés</small>
@@ -426,12 +425,11 @@ export default function EnveloppesPage() {
                   className="form-input"
                   value={editAnnualVersement}
                   onChange={(e) => {
+                    const annualValue = parseFloat(e.target.value) || 0;
                     setEditAnnualVersement(e.target.value);
                     // Auto-calculate total: prev_year + annual
-                    if (prevYearVersements > 0 || e.target.value) {
-                      const annual = parseFloat(e.target.value) || 0;
-                      setEditEnvelopeVersements((prevYearVersements + annual).toString());
-                    }
+                    const newTotal = prevYearVersements + annualValue;
+                    setEditEnvelopeVersements(newTotal.toString());
                   }}
                   placeholder={prevYearVersements > 0 ? `Calculé: ${prevYearVersements} + ...` : "Laissez vide"}
                 />
