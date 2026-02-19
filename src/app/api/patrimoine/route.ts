@@ -52,7 +52,16 @@ export async function GET(request: NextRequest) {
         SELECT DISTINCT year FROM placements ORDER BY year DESC
       `) as any[];
 
-      const historicalTotals = await query('SELECT * FROM historical_totals') as any[];
+      // Try to get historical totals, but handle case where table doesn't exist
+      let historicalTotals: any[] = [];
+      try {
+        historicalTotals = await query('SELECT * FROM historical_totals') as any[];
+      } catch (error: any) {
+        // Table doesn't exist, skip historical data
+        if (error.code !== 'ER_NO_SUCH_TABLE') {
+          throw error;
+        }
+      }
       const historicalMap = new Map(historicalTotals.map(h => [h.year, h.total]));
 
       const allYears = new Set([...years.map(y => y.year), ...historicalTotals.map(h => h.year)]);
@@ -220,8 +229,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === 'historical') {
-      const historical = await query('SELECT * FROM historical_totals ORDER BY year DESC');
-      return NextResponse.json(historical);
+      try {
+        const historical = await query('SELECT * FROM historical_totals ORDER BY year DESC');
+        return NextResponse.json(historical);
+      } catch (error: any) {
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+          return NextResponse.json([]);
+        }
+        throw error;
+      }
     }
 
     return NextResponse.json({ error: 'Type requis' }, { status: 400 });
@@ -237,11 +253,18 @@ export async function POST(request: NextRequest) {
     const { name, versements, year, exclude_from_gains, historical_year, historical_total } = body;
 
     if (historical_year !== undefined && historical_total !== undefined) {
-      await query(
-        `INSERT INTO historical_totals (year, total) VALUES (?, ?) ON DUPLICATE KEY UPDATE total = ?`,
-        [parseInt(historical_year), parseFloat(historical_total), parseFloat(historical_total)]
-      );
-      return NextResponse.json({ success: true });
+      try {
+        await query(
+          `INSERT INTO historical_totals (year, total) VALUES (?, ?) ON DUPLICATE KEY UPDATE total = ?`,
+          [parseInt(historical_year), parseFloat(historical_total), parseFloat(historical_total)]
+        );
+        return NextResponse.json({ success: true });
+      } catch (error: any) {
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+          return NextResponse.json({ error: 'La table historical_totals n\'existe pas. Veuillez exécuter npm run db:init pour créer les tables manquantes.' }, { status: 400 });
+        }
+        throw error;
+      }
     }
 
     if (!name) {
@@ -309,8 +332,15 @@ export async function DELETE(request: NextRequest) {
     const historical_year = searchParams.get('historical_year');
 
     if (historical_year) {
-      await query('DELETE FROM historical_totals WHERE year = ?', [parseInt(historical_year)]);
-      return NextResponse.json({ success: true });
+      try {
+        await query('DELETE FROM historical_totals WHERE year = ?', [parseInt(historical_year)]);
+        return NextResponse.json({ success: true });
+      } catch (error: any) {
+        if (error.code === 'ER_NO_SUCH_TABLE') {
+          return NextResponse.json({ error: 'La table historical_totals n\'existe pas.' }, { status: 400 });
+        }
+        throw error;
+      }
     }
 
     if (envelopeId && year) {
