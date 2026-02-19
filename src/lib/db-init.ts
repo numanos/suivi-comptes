@@ -75,10 +75,6 @@ CREATE TABLE IF NOT EXISTS transactions (
   FOREIGN KEY (import_batch_id) REFERENCES import_batches(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE INDEX idx_transactions_date ON transactions(date);
-CREATE INDEX idx_transactions_category ON transactions(category_id);
-CREATE INDEX idx_transactions_month ON transactions(date);
-
 -- Enveloppes table (patrimoine)
 CREATE TABLE IF NOT EXISTS envelopes (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -119,10 +115,31 @@ CREATE TABLE IF NOT EXISTS placements (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (envelope_id) REFERENCES envelopes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE INDEX idx_placements_year ON placements(year);
-CREATE INDEX idx_placements_envelope ON placements(envelope_id, year);
 `;
+
+// Indexes to create (may already exist)
+const indexes = [
+  { name: 'idx_transactions_date', sql: 'CREATE INDEX idx_transactions_date ON transactions(date)' },
+  { name: 'idx_transactions_category', sql: 'CREATE INDEX idx_transactions_category ON transactions(category_id)' },
+  { name: 'idx_transactions_month', sql: 'CREATE INDEX idx_transactions_month ON transactions(YEAR(date), MONTH(date))' },
+  { name: 'idx_placements_year', sql: 'CREATE INDEX idx_placements_year ON placements(year)' },
+  { name: 'idx_placements_envelope', sql: 'CREATE INDEX idx_placements_envelope ON placements(envelope_id, year)' }
+];
+
+async function createIndexes(connection: any) {
+  for (const idx of indexes) {
+    try {
+      await connection.query(idx.sql);
+      console.log(`Index ${idx.name} created`);
+    } catch (error: any) {
+      if (error.code === 'ER_DUP_KEYNAME') {
+        console.log(`Index ${idx.name} already exists, skipping`);
+      } else {
+        throw error;
+      }
+    }
+  }
+}
 
 async function initDatabase() {
   let connection;
@@ -147,6 +164,9 @@ async function initDatabase() {
     // Create tables
     await connection.query(createTablesSQL);
     console.log('All tables created successfully');
+    
+    // Create indexes (ignore if already exists)
+    await createIndexes(connection);
     
     // Seed default themes
     const [themes] = await connection.query('SELECT COUNT(*) as count FROM themes') as any[];
