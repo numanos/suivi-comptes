@@ -62,7 +62,7 @@ export default function BudgetPage() {
       
       const res = await fetch(`/api/transactions?${params}`);
       const data = await res.json();
-      setTransactions(data);
+      setTransactions(data.transactions || data || []);
     } catch (error) {
       console.error(error);
     } finally {
