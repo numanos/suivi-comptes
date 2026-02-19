@@ -277,13 +277,16 @@ export async function POST(request: NextRequest) {
     const { name, versements, year, exclude_from_gains, historical_year, historical_total } = body;
 
     if (historical_year !== undefined && historical_total !== undefined) {
+      console.log('Saving historical data:', { historical_year, historical_total });
       try {
-        await query(
+        const result = await query(
           `INSERT INTO historical_totals (year, total) VALUES (?, ?) ON DUPLICATE KEY UPDATE total = ?`,
           [parseInt(historical_year), parseFloat(historical_total), parseFloat(historical_total)]
         );
+        console.log('Historical data saved:', result);
         return NextResponse.json({ success: true });
       } catch (error: any) {
+        console.error('Error saving historical data:', error);
         if (error.code === 'ER_NO_SUCH_TABLE') {
           return NextResponse.json({ error: 'La table historical_totals n\'existe pas. Veuillez exécuter npm run db:init pour créer les tables manquantes.' }, { status: 400 });
         }
