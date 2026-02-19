@@ -58,6 +58,9 @@ export default function PatrimoinePage() {
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [loading, setLoading] = useState(true);
+  const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+  const [historicalYear, setHistoricalYear] = useState('');
+  const [historicalTotal, setHistoricalTotal] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -131,10 +134,6 @@ export default function PatrimoinePage() {
   };
 
   const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidites'];
-
-  const [showHistoricalModal, setShowHistoricalModal] = useState(false);
-  const [historicalYear, setHistoricalYear] = useState('');
-  const [historicalTotal, setHistoricalTotal] = useState('');
 
   const saveHistoricalTotal = async () => {
     if (!historicalYear || !historicalTotal) return;
