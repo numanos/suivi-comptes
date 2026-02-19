@@ -91,6 +91,24 @@ export default function AdminPage() {
 
       <div className="card">
         <div className="card-header">
+          <h2 className="card-title">Patrimoine - Enveloppes</h2>
+        </div>
+        <p style={{ marginBottom: '1rem', color: 'var(--text-light)' }}>
+          Gestion des enveloppes de patrimoine. La suppression est irréversible.
+        </p>
+        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn btn-danger" 
+            onClick={() => handleAction('purge_envelopes')}
+            disabled={loading}
+          >
+            Supprimer toutes les enveloppes
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
           <h2 className="card-title" style={{ color: '#dc2626' }}>⚠️ Zone dangereuse</h2>
         </div>
         <p style={{ marginBottom: '1rem', color: 'var(--text-light)' }}>

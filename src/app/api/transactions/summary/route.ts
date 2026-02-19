@@ -47,8 +47,35 @@ export async function GET(request: NextRequest) {
         total_expenses: row.total_expenses || 0,
         total_income: row.total_income || 0,
         total_savings: row.total_savings || 0,
-        net: (row.total_income || 0) - (row.total_expenses || 0)
+        net: (row.total_income || 0) - (row.total_expenses || 0),
+        balance: null as number | null
       }));
+
+      // Get balance for each month (last transaction with balance for that month)
+      const balanceRows = await query(`
+        SELECT 
+          MONTH(t.date) as month,
+          YEAR(t.date) as year,
+          t.balance
+        FROM transactions t
+        WHERE YEAR(t.date) = ? AND t.balance IS NOT NULL
+        ORDER BY year, month, t.date DESC
+      `, [targetYear]) as any[];
+
+      // Get the last balance for each month
+      const lastBalanceByMonth = new Map<string, number>();
+      for (const row of balanceRows) {
+        const key = `${row.year}-${row.month}`;
+        if (!lastBalanceByMonth.has(key)) {
+          lastBalanceByMonth.set(key, row.balance);
+        }
+      }
+
+      // Merge balance into summary
+      for (const row of summary) {
+        const key = `${row.year}-${row.month}`;
+        row.balance = lastBalanceByMonth.get(key) || null;
+      }
 
       return NextResponse.json(summary);
     }

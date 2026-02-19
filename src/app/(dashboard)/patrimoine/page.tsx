@@ -5,6 +5,7 @@ import { AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 
 interface EvolutionData {
   year: number;
+  isHistorical?: boolean;
   actions: number;
   immo: number;
   obligations: number;
@@ -131,6 +132,31 @@ export default function PatrimoinePage() {
 
   const TYPES = ['Action', 'Immo', 'Obligations', 'Liquidites'];
 
+  const [showHistoricalModal, setShowHistoricalModal] = useState(false);
+  const [historicalYear, setHistoricalYear] = useState('');
+  const [historicalTotal, setHistoricalTotal] = useState('');
+
+  const saveHistoricalTotal = async () => {
+    if (!historicalYear || !historicalTotal) return;
+    await fetch('/api/patrimoine?type=post', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        historical_year: parseInt(historicalYear),
+        historical_total: parseFloat(historicalTotal)
+      })
+    });
+    setShowHistoricalModal(false);
+    setHistoricalYear('');
+    setHistoricalTotal('');
+    fetchData();
+  };
+
+  const deleteHistoricalYear = async (yr: number) => {
+    await fetch(`/api/patrimoine?historical_year=${yr}`, { method: 'DELETE' });
+    fetchData();
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -146,6 +172,81 @@ export default function PatrimoinePage() {
           </select>
         </div>
       </div>
+
+      {/* Historical totals management */}
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="card-header" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 className="card-title">Historique pré-diversification</h2>
+          <button className="btn btn-primary" onClick={() => setShowHistoricalModal(true)}>
+            + Ajouter
+          </button>
+        </div>
+        {evolutionData.filter(d => d.isHistorical).length > 0 && (
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Année</th>
+                  <th style={{ textAlign: 'right' }}>Total</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {evolutionData.filter(d => d.isHistorical).map(d => (
+                  <tr key={d.year}>
+                    <td>{d.year}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatAmount(d.total)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }} onClick={() => deleteHistoricalYear(d.year)}>
+                        Supprimer
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Historical modal */}
+      {showHistoricalModal && (
+        <div className="modal-overlay" onClick={() => setShowHistoricalModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Ajouter un total historique</h3>
+              <button className="modal-close" onClick={() => setShowHistoricalModal(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Année</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={historicalYear}
+                  onChange={e => setHistoricalYear(e.target.value)}
+                  placeholder="Ex: 2019"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Total du patrimoine</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={historicalTotal}
+                  onChange={e => setHistoricalTotal(e.target.value)}
+                  placeholder="Ex: 150000"
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowHistoricalModal(false)}>Annuler</button>
+              <button className="btn btn-primary" onClick={saveHistoricalTotal}>Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats for selected year */}
       {summaryData && (
@@ -204,7 +305,7 @@ export default function PatrimoinePage() {
               <Area type="monotone" dataKey="Obligations" stackId="1" stroke={COLORS[2]} fill={COLORS[2]} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Immobilier" stackId="1" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Actions" stackId="1" stroke={COLORS[0]} fill={COLORS[0]} fillOpacity={0.6} />
-              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={false} />
+              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={{ r: 5, fill: '#000' }} activeDot={{ r: 8 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

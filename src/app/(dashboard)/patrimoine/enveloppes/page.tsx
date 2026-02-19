@@ -129,6 +129,26 @@ export default function EnveloppesPage() {
     }
   };
 
+  const handleCloseEnvelope = async (id: number, envelopeName: string) => {
+    const currentYear = parseInt(year);
+    if (!confirm(`Fermer l\'enveloppe "${envelopeName}" à partir de ${currentYear} ? Elle ne sera plus disponible pour ${currentYear} et les années suivantes, mais l'historique sera préservé.`)) return;
+    
+    try {
+      await fetch('/api/patrimoine', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          close_envelope: true,
+          year: currentYear
+        })
+      });
+      fetchEnvelopes();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleAddPlacement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPlacementName.trim() || !selectedEnvelopeId) return;
@@ -545,6 +565,13 @@ export default function EnveloppesPage() {
                         ↻ Année N-1
                       </button>
                     )}
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => handleCloseEnvelope(envelope.id, envelope.name)}
+                      title={`Fermer l'enveloppe à partir de ${year}`}
+                    >
+                      Fermer
+                    </button>
                     <button
                       className="btn btn-danger"
                       onClick={() => handleDeleteEnvelope(envelope.id)}

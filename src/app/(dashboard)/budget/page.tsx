@@ -378,6 +378,7 @@ export default function BudgetPage() {
                   <th>Catégorie</th>
                   <th>Sous-catégorie</th>
                   <th style={{ textAlign: 'right' }}>Montant</th>
+                  <th style={{ textAlign: 'right' }}>Solde</th>
                   <th style={{ width: '150px' }}>Actions</th>
                 </tr>
               </thead>
@@ -403,6 +404,7 @@ export default function BudgetPage() {
                         {formatAmount(t.amount)}
                       </span>
                     </td>
+                    <td style={{ textAlign: 'right', fontWeight: 500 }}>{t.balance !== null ? formatAmount(t.balance) : '-'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
                         <button 

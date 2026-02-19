@@ -11,15 +11,16 @@ export async function GET(request: NextRequest) {
       const targetYear = year || new Date().getFullYear();
       
       const envelopes = await query(`
-        SELECT e.id, e.name, e.exclude_from_gains,
+        SELECT e.id, e.name, e.exclude_from_gains, e.closed_year,
                ev.versements as year_versements,
                p.id as placement_id, p.name as placement_name, 
                p.type_placement, p.year, p.valorization
         FROM envelopes e
         LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
         LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+        WHERE e.closed_year IS NULL OR e.closed_year > ?
         ORDER BY e.name
-      `, [targetYear, targetYear]) as any[];
+      `, [targetYear, targetYear, targetYear]) as any[];
 
       const envelopeMap = new Map();
       for (const row of envelopes) {
@@ -51,45 +52,73 @@ export async function GET(request: NextRequest) {
         SELECT DISTINCT year FROM placements ORDER BY year DESC
       `) as any[];
 
+      const historicalTotals = await query('SELECT * FROM historical_totals') as any[];
+      const historicalMap = new Map(historicalTotals.map(h => [h.year, h.total]));
+
+      const allYears = new Set([...years.map(y => y.year), ...historicalTotals.map(h => h.year)]);
+      const sortedYears = Array.from(allYears).sort((a, b) => b - a);
+
       const evolution = [];
 
-      for (const yearRow of years) {
-        const yr = yearRow.year;
+      for (const yr of sortedYears) {
+        const isHistorical = historicalMap.has(yr);
         
-        const rows = await query(`
-          SELECT 
-            p.type_placement as type,
-            SUM(p.valorization) as total
-          FROM placements p
-          WHERE p.year = ?
-          GROUP BY p.type_placement
-        `, [yr]) as any[];
+        let totals: Record<string, number>;
+        let total: number;
 
-        const totals: Record<string, number> = {
-          'Action': 0,
-          'Immo': 0,
-          'Obligations': 0,
-          'Liquidites': 0
-        };
+        if (isHistorical) {
+          totals = {
+            'Action': 0,
+            'Immo': 0,
+            'Obligations': 0,
+            'Liquidites': 0
+          };
+          total = Number(historicalMap.get(yr)) || 0;
+        } else {
+          const rows = await query(`
+            SELECT 
+              p.type_placement as type,
+              SUM(p.valorization) as total
+            FROM placements p
+            WHERE p.year = ?
+            GROUP BY p.type_placement
+          `, [yr]) as any[];
 
-        for (const row of rows) {
-          totals[row.type] = Number(row.total) || 0;
+          totals = {
+            'Action': 0,
+            'Immo': 0,
+            'Obligations': 0,
+            'Liquidites': 0
+          };
+
+          for (const row of rows) {
+            totals[row.type] = Number(row.total) || 0;
+          }
+
+          total = Object.values(totals).reduce((a: number, b: number) => a + b, 0);
+        }
+        
+        let prevTotal = 0;
+        
+        if (yr > 1) {
+          if (historicalMap.has(yr - 1)) {
+            prevTotal = Number(historicalMap.get(yr - 1)) || 0;
+          } else {
+            const prevYearRows = await query(`
+              SELECT SUM(p.valorization) as total
+              FROM placements p
+              WHERE p.year = ?
+            `, [yr - 1]) as any[];
+            prevTotal = Number(prevYearRows[0]?.total) || 0;
+          }
         }
 
-        const total = Object.values(totals).reduce((a: number, b: number) => a + b, 0);
-        
-        const prevYearRows = await query(`
-          SELECT SUM(p.valorization) as total
-          FROM placements p
-          WHERE p.year = ?
-        `, [yr - 1]) as any[];
-
-        const prevTotal = Number(prevYearRows[0]?.total) || 0;
         const evolutionVal = total - prevTotal;
         const evolutionPercent = prevTotal > 0 ? (evolutionVal / prevTotal) * 100 : null;
 
         evolution.push({
           year: yr,
+          isHistorical,
           actions: totals['Action'],
           immo: totals['Immo'],
           obligations: totals['Obligations'],
@@ -190,6 +219,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(summary);
     }
 
+    if (type === 'historical') {
+      const historical = await query('SELECT * FROM historical_totals ORDER BY year DESC');
+      return NextResponse.json(historical);
+    }
+
     return NextResponse.json({ error: 'Type requis' }, { status: 400 });
   } catch (error) {
     console.error('Error fetching patrimoine:', error);
@@ -199,7 +233,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, versements, year, exclude_from_gains } = await request.json();
+    const body = await request.json();
+    const { name, versements, year, exclude_from_gains, historical_year, historical_total } = body;
+
+    if (historical_year !== undefined && historical_total !== undefined) {
+      await query(
+        `INSERT INTO historical_totals (year, total) VALUES (?, ?) ON DUPLICATE KEY UPDATE total = ?`,
+        [parseInt(historical_year), parseFloat(historical_total), parseFloat(historical_total)]
+      );
+      return NextResponse.json({ success: true });
+    }
 
     if (!name) {
       return NextResponse.json(
@@ -231,15 +274,15 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, name, exclude_from_gains, year, versements } = await request.json();
+    const { id, name, exclude_from_gains, year, versements, close_envelope } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'ID requis' }, { status: 400 });
     }
 
     await query(
-      'UPDATE envelopes SET name = ?, exclude_from_gains = ? WHERE id = ?',
-      [name || '', exclude_from_gains ? true : false, id]
+      'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ? WHERE id = ?',
+      [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, id]
     );
 
     if (year && versements !== undefined) {
@@ -263,6 +306,12 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     const envelopeId = searchParams.get('envelope_id');
     const year = searchParams.get('year');
+    const historical_year = searchParams.get('historical_year');
+
+    if (historical_year) {
+      await query('DELETE FROM historical_totals WHERE year = ?', [parseInt(historical_year)]);
+      return NextResponse.json({ success: true });
+    }
 
     if (envelopeId && year) {
       await query('DELETE FROM placements WHERE envelope_id = ? AND year = ?', [parseInt(envelopeId), parseInt(year)]);

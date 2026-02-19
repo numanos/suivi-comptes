@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface AnnualData {
   year: number;
@@ -48,7 +48,8 @@ export default function RecapPage() {
     name: monthNames[d.month - 1],
     Dépenses: d.total_expenses,
     Revenus: d.total_income,
-    Épargne: d.total_savings
+    Épargne: d.total_savings,
+    Solde: d.balance
   }));
 
   // Calculate YTD totals for current year
@@ -156,6 +157,27 @@ export default function RecapPage() {
         </div>
       </div>
 
+      {/* Monthly balance chart */}
+      {monthlyData.some(d => d.balance !== null) && (
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Solde mensuel {currentYear}</h2>
+          </div>
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData.filter(d => d.Solde !== null)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value: number) => formatAmount(value)} />
+                <Legend />
+                <Line type="monotone" dataKey="Solde" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {/* Monthly detail table */}
       <div className="card">
         <div className="card-header">
@@ -169,7 +191,8 @@ export default function RecapPage() {
                 <th style={{ textAlign: 'right' }}>Dépenses</th>
                 <th style={{ textAlign: 'right' }}>Revenus</th>
                 <th style={{ textAlign: 'right' }}>Épargne</th>
-                <th style={{ textAlign: 'right' }}>Solde</th>
+                <th style={{ textAlign: 'right' }}>Solde net</th>
+                <th style={{ textAlign: 'right' }}>Solde compte</th>
               </tr>
             </thead>
             <tbody>
@@ -183,6 +206,9 @@ export default function RecapPage() {
                     <span className={d.net >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
                       {formatAmount(d.net)}
                     </span>
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 500 }}>
+                    {d.balance !== null ? formatAmount(d.balance) : '-'}
                   </td>
                 </tr>
               ))}
