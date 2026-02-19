@@ -17,6 +17,7 @@ interface Envelope {
   name: string;
   exclude_from_gains: boolean;
   year_versements: number;
+  annual_versement: number | null;
   placements: Placement[];
 }
 
@@ -38,6 +39,7 @@ export default function EnveloppesPage() {
   const [newEnvelopeVersements, setNewEnvelopeVersements] = useState('');
   const [editExcludeFromGains, setEditExcludeFromGains] = useState(false);
   const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
+  const [editAnnualVersement, setEditAnnualVersement] = useState('');
   
   const [newPlacementName, setNewPlacementName] = useState('');
   const [newPlacementType, setNewPlacementType] = useState('Action');
@@ -106,7 +108,8 @@ export default function EnveloppesPage() {
           name: editingEnvelope.name,
           exclude_from_gains: editExcludeFromGains,
           year: parseInt(year),
-          versements: parseFloat(editEnvelopeVersements) || 0
+          versements: parseFloat(editEnvelopeVersements) || 0,
+          annual_versement: editAnnualVersement ? parseFloat(editAnnualVersement) : null
         })
       });
       setShowEditEnvelope(false);
@@ -314,36 +317,32 @@ export default function EnveloppesPage() {
             <h2 className="card-title">Répartition du patrimoine {year}</h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2rem', padding: '1rem' }}>
-            <div style={{ width: 300, height: 300 }}>
+            <div style={{ width: 500, height: 350 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     dataKey="value"
                     nameKey="name"
-                    cx="50%"
+                    cx="35%"
                     cy="50%"
                     outerRadius={100}
                     label={({ name, percent }) => `${percent.toFixed(1)}%`}
+                    labelLine={{ stroke: '#666', strokeWidth: 1 }}
                   >
                     {pieData.map((entry, index) => (
                       <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => formatAmount(value)} />
-                  <Legend formatter={(value) => TYPE_LABELS[value] || value} />
+                  <Legend 
+                    layout="vertical" 
+                    verticalAlign="middle" 
+                    align="right"
+                    formatter={(value, entry: any) => `${TYPE_LABELS[value] || value}: ${formatAmount(entry.payload.value)}`}
+                  />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-            <div>
-              {pieData.map((item, idx) => (
-                <div key={item.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: COLORS[idx] }}></span>
-                  <span>{TYPE_LABELS[item.name] || item.name}:</span>
-                  <strong>{formatAmount(item.value)}</strong>
-                  <span style={{ color: 'var(--text-light)' }}>({item.percent.toFixed(1)}%)</span>
-                </div>
-              ))}
             </div>
           </div>
         </div>
@@ -410,6 +409,19 @@ export default function EnveloppesPage() {
                   value={editEnvelopeVersements}
                   onChange={(e) => setEditEnvelopeVersements(e.target.value)}
                 />
+                <small style={{ color: 'var(--text-light)' }}>Versements cumulés depuis l'ouverture</small>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Versement annuel (optionnel)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={editAnnualVersement}
+                  onChange={(e) => setEditAnnualVersement(e.target.value)}
+                  placeholder="Laissez vide pour utiliser les versements cumulés"
+                />
+                <small style={{ color: 'var(--text-light)' }}>Si renseigné, remplace le calcul des versements cumulés pour le gain</small>
               </div>
               <div className="form-group">
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -534,14 +546,22 @@ export default function EnveloppesPage() {
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {envelopes.map((envelope) => {
             const totalValorization = envelope.placements.reduce((sum, p) => sum + (Number(p.valorization) || 0), 0);
-            const gain = envelope.exclude_from_gains ? null : totalValorization - (Number(envelope.year_versements) || 0);
+            const versements = envelope.annual_versement !== null && envelope.annual_versement !== undefined 
+              ? envelope.annual_versement 
+              : (Number(envelope.year_versements) || 0);
+            const gain = envelope.exclude_from_gains ? null : totalValorization - versements;
             
             return (
               <div key={envelope.id} className="card">
                 <div className="card-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <h2 className="card-title">{envelope.name}</h2>
-                    <span className="badge badge-secondary">{formatAmount(envelope.year_versements)} versés</span>
+                    <span className="badge badge-secondary">
+                      {formatAmount(versements)} versés
+                      {envelope.annual_versement !== null && envelope.annual_versement !== undefined && (
+                        <span style={{ fontSize: '0.75rem', marginLeft: '0.25rem' }}>(annuel)</span>
+                      )}
+                    </span>
                     {envelope.exclude_from_gains && <span className="badge badge-warning">Gain désactivé</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -550,6 +570,7 @@ export default function EnveloppesPage() {
                       onClick={() => {
                         setEditingEnvelope(envelope);
                         setEditEnvelopeVersements(envelope.year_versements?.toString() || '0');
+                        setEditAnnualVersement(envelope.annual_versement?.toString() || '');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}
@@ -603,7 +624,7 @@ export default function EnveloppesPage() {
                       ) : (
                         <span style={{ marginLeft: '1rem' }}>
                           Gain: <span className={gain !== null && gain >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                            {gain !== null ? formatAmount(gain) : '-'} ({envelope.year_versements > 0 ? (gain! / envelope.year_versements * 100).toFixed(1) : '0'}%)
+                            {gain !== null ? formatAmount(gain) : '-'} ({versements > 0 ? (gain! / versements * 100).toFixed(1) : '0'}%)
                           </span>
                         </span>
                       )}

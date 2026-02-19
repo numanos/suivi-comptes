@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 
 interface EvolutionData {
   year: number;
@@ -350,8 +350,10 @@ export default function PatrimoinePage() {
               <Area type="monotone" dataKey="Obligations" stackId="1" stroke={COLORS[2]} fill={COLORS[2]} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Immobilier" stackId="1" stroke={COLORS[1]} fill={COLORS[1]} fillOpacity={0.6} />
               <Area type="monotone" dataKey="Actions" stackId="1" stroke={COLORS[0]} fill={COLORS[0]} fillOpacity={0.6} />
-              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={{ r: 5, fill: '#000' }} activeDot={{ r: 8 }} />
-              <Line type="monotone" dataKey="Projected" stroke="#dc2626" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 4, fill: '#dc2626' }} name="Prévisionnel (5% + 12k€/an)" />
+              <Line type="monotone" dataKey="Total" stroke="#000" strokeWidth={3} dot={false}>
+                <LabelList dataKey="Total" position="top" formatter={(value: number) => formatAmount(value)} style={{ fontSize: '12px', fontWeight: 'bold' }} />
+              </Line>
+              <Line type="monotone" dataKey="Projected" stroke="#dc2626" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Prévisionnel (5% + 12k€/an)" />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
