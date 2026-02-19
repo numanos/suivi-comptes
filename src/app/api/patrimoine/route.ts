@@ -10,17 +10,37 @@ export async function GET(request: NextRequest) {
     if (type === 'envelopes') {
       const targetYear = year || new Date().getFullYear();
       
-      const envelopes = await query(`
-        SELECT e.id, e.name, e.exclude_from_gains, e.closed_year,
-               ev.versements as year_versements,
-               p.id as placement_id, p.name as placement_name, 
-               p.type_placement, p.year, p.valorization
-        FROM envelopes e
-        LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-        LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-        WHERE e.closed_year IS NULL OR e.closed_year > ?
-        ORDER BY e.name
-      `, [targetYear, targetYear, targetYear]) as any[];
+      // Try query with closed_year column, fallback to query without it
+      let envelopes: any[];
+      try {
+        envelopes = await query(`
+          SELECT e.id, e.name, e.exclude_from_gains, e.closed_year,
+                 ev.versements as year_versements,
+                 p.id as placement_id, p.name as placement_name, 
+                 p.type_placement, p.year, p.valorization
+          FROM envelopes e
+          LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
+          LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+          WHERE e.closed_year IS NULL OR e.closed_year > ?
+          ORDER BY e.name
+        `, [targetYear, targetYear, targetYear]) as any[];
+      } catch (error: any) {
+        if (error.code === 'ER_BAD_FIELD_ERROR' && error.sqlMessage?.includes('closed_year')) {
+          // Fallback: query without closed_year column
+          envelopes = await query(`
+            SELECT e.id, e.name, e.exclude_from_gains,
+                   ev.versements as year_versements,
+                   p.id as placement_id, p.name as placement_name, 
+                   p.type_placement, p.year, p.valorization
+            FROM envelopes e
+            LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
+            LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+            ORDER BY e.name
+          `, [targetYear, targetYear]) as any[];
+        } else {
+          throw error;
+        }
+      }
 
       const envelopeMap = new Map();
       for (const row of envelopes) {
@@ -303,10 +323,22 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'ID requis' }, { status: 400 });
     }
 
-    await query(
-      'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ? WHERE id = ?',
-      [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, id]
-    );
+    try {
+      await query(
+        'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ? WHERE id = ?',
+        [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, id]
+      );
+    } catch (error: any) {
+      if (error.code === 'ER_BAD_FIELD_ERROR' && error.sqlMessage?.includes('closed_year')) {
+        // Fallback: update without closed_year column
+        await query(
+          'UPDATE envelopes SET name = ?, exclude_from_gains = ? WHERE id = ?',
+          [name || '', exclude_from_gains ? true : false, id]
+        );
+      } else {
+        throw error;
+      }
+    }
 
     if (year && versements !== undefined) {
       await query(
