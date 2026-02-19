@@ -109,7 +109,7 @@ export default function EnveloppesPage() {
           name: editingEnvelope.name,
           exclude_from_gains: editExcludeFromGains,
           year: parseInt(year),
-          versements: parseFloat(editEnvelopeVersements) || 0
+          versements: parseFloat(editAnnualVersement) || 0
         })
       });
       setShowEditEnvelope(false);
