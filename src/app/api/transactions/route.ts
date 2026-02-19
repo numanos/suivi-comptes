@@ -9,8 +9,21 @@ export async function GET(request: NextRequest) {
     const categoryId = searchParams.get('category');
     const subcategoryId = searchParams.get('subcategory');
     const libelle = searchParams.get('libelle');
-    const limit = searchParams.get('limit') || '100';
+    const limit = searchParams.get('limit') || '50';
     const offset = searchParams.get('offset') || '0';
+    const getYears = searchParams.get('getYears');
+
+    // Return available years
+    if (getYears === 'true') {
+      const years = await query(`
+        SELECT DISTINCT YEAR(date) as year FROM transactions ORDER BY year DESC
+      `) as any[];
+      return NextResponse.json({ years: years.map(y => y.year) });
+    }
+
+    // Get total count for pagination
+    let countSql = `SELECT COUNT(*) as total FROM transactions t WHERE 1=1`;
+    const countParams: any[] = [];
 
     let sql = `
       SELECT t.id, t.date, t.libelle, t.note, t.amount, 
@@ -31,30 +44,42 @@ export async function GET(request: NextRequest) {
 
     if (month) {
       sql += ' AND MONTH(t.date) = ?';
+      countSql += ' AND MONTH(t.date) = ?';
       params.push(parseInt(month));
+      countParams.push(parseInt(month));
     }
 
     if (categoryId) {
       sql += ' AND t.category_id = ?';
+      countSql += ' AND t.category_id = ?';
       params.push(parseInt(categoryId));
+      countParams.push(parseInt(categoryId));
     }
 
     if (subcategoryId) {
       sql += ' AND t.subcategory_id = ?';
+      countSql += ' AND t.subcategory_id = ?';
       params.push(parseInt(subcategoryId));
+      countParams.push(parseInt(subcategoryId));
     }
 
     if (libelle) {
       sql += ' AND t.libelle LIKE ?';
+      countSql += ' AND t.libelle LIKE ?';
       params.push(`%${libelle}%`);
+      countParams.push(`%${libelle}%`);
     }
+
+    // Get total count
+    const countResult = await query(countSql, countParams) as any[];
+    const total = countResult[0]?.total || 0;
 
     sql += ' ORDER BY t.date DESC, t.id DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
     const rows = await query(sql, params) as any[];
 
-    return NextResponse.json(rows);
+    return NextResponse.json({ transactions: rows, total, limit: parseInt(limit), offset: parseInt(offset) });
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });

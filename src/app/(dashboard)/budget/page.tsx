@@ -48,7 +48,25 @@ export default function BudgetPage() {
   const [editSubcategoryId, setEditSubcategoryId] = useState<number | null>(null);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<any>(null);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [pagination, setPagination] = useState({ total: 0, limit: 50, offset: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchYears = async () => {
+    try {
+      const res = await fetch('/api/transactions?getYears=true');
+      const data = await res.json();
+      if (data.years) {
+        setAvailableYears(data.years);
+        // Set default year to most recent if current year not available
+        if (data.years.length > 0 && !data.years.includes(parseInt(year))) {
+          setYear(data.years[0].toString());
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -59,10 +77,15 @@ export default function BudgetPage() {
       if (filterLibelle) params.set('libelle', filterLibelle);
       if (filterCategory) params.set('category', filterCategory);
       if (filterSubcategory) params.set('subcategory', filterSubcategory);
+      params.set('limit', pagination.limit.toString());
+      params.set('offset', pagination.offset.toString());
       
       const res = await fetch(`/api/transactions?${params}`);
       const data = await res.json();
-      setTransactions(data);
+      setTransactions(data.transactions || []);
+      if (data.total !== undefined) {
+        setPagination(prev => ({ ...prev, total: data.total }));
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -81,15 +104,13 @@ export default function BudgetPage() {
   };
 
   useEffect(() => {
-    fetchTransactions();
+    fetchYears();
     fetchCategories();
   }, []);
 
   useEffect(() => {
-    if (!filterLibelle && !filterCategory && !filterSubcategory) {
-      fetchTransactions();
-    }
-  }, [filterLibelle, filterCategory, filterSubcategory]);
+    fetchTransactions();
+  }, [year, month, pagination.offset, pagination.limit]);
 
   const handleImport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,15 +316,17 @@ export default function BudgetPage() {
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Année</label>
-            <select className="form-select" value={year} onChange={(e) => setYear(e.target.value)}>
-              {[2024, 2025, 2026, 2027].map(y => (
+            <select className="form-select" value={year} onChange={(e) => { setYear(e.target.value); setPagination(p => ({ ...p, offset: 0 })); }}>
+              {availableYears.length > 0 ? availableYears.map(y => (
+                <option key={y} value={y}>{y}</option>
+              )) : [2024, 2025, 2026, 2027].map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Mois</label>
-            <select className="form-select" value={month} onChange={(e) => setMonth(e.target.value)}>
+            <select className="form-select" value={month} onChange={(e) => { setMonth(e.target.value); setPagination(p => ({ ...p, offset: 0 })); }}>
               <option value="">Tous</option>
               {['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'].map((m, i) => (
                 <option key={i + 1} value={i + 1}>{m}</option>
@@ -344,6 +367,7 @@ export default function BudgetPage() {
               setFilterLibelle('');
               setFilterCategory('');
               setFilterSubcategory('');
+              setPagination(p => ({ ...p, offset: 0 }));
             }}>
               Effacer filtres
             </button>
@@ -428,6 +452,31 @@ export default function BudgetPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {pagination.total > pagination.limit && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', padding: '0.5rem' }}>
+              <div style={{ color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                Affichage de {pagination.offset + 1} à {Math.min(pagination.offset + pagination.limit, pagination.total)} sur {pagination.total} transactions
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setPagination(p => ({ ...p, offset: Math.max(0, p.offset - p.limit) }))}
+                  disabled={pagination.offset === 0}
+                >
+                  Précédent
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => setPagination(p => ({ ...p, offset: p.offset + p.limit }))}
+                  disabled={pagination.offset + pagination.limit >= pagination.total}
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          )}
         )}
       </div>
 
