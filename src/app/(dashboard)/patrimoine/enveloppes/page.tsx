@@ -19,6 +19,7 @@ interface Envelope {
   year_versements: number;
   annual_versement: number | null;
   open_year: number | null;
+  initial_amount: number | null;
   placements: Placement[];
 }
 
@@ -43,6 +44,7 @@ export default function EnveloppesPage() {
   const [editEnvelopeVersements, setEditEnvelopeVersements] = useState('');
   const [editAnnualVersement, setEditAnnualVersement] = useState('');
   const [editOpenYear, setEditOpenYear] = useState('');
+  const [editInitialAmount, setEditInitialAmount] = useState('');
   
   const [newPlacementName, setNewPlacementName] = useState('');
   const [newPlacementType, setNewPlacementType] = useState('Action');
@@ -113,7 +115,8 @@ export default function EnveloppesPage() {
           year: parseInt(year),
           versements: parseFloat(editEnvelopeVersements) || 0,
           annual_versement: editAnnualVersement ? parseFloat(editAnnualVersement) : null,
-          open_year: editOpenYear ? parseInt(editOpenYear) : null
+          open_year: editOpenYear ? parseInt(editOpenYear) : null,
+          initial_amount: editInitialAmount ? parseFloat(editInitialAmount) : 0
         })
       });
       setShowEditEnvelope(false);
@@ -416,6 +419,18 @@ export default function EnveloppesPage() {
                 <small style={{ color: 'var(--text-light)' }}>Versements cumulés depuis l'ouverture</small>
               </div>
               <div className="form-group">
+                <label className="form-label">Versement initial</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="form-input"
+                  value={editInitialAmount}
+                  onChange={(e) => setEditInitialAmount(e.target.value)}
+                  placeholder="Montant versé à l'ouverture"
+                />
+                <small style={{ color: 'var(--text-light)' }}>Capital de départ (année d'ouverture)</small>
+              </div>
+              <div className="form-group">
                 <label className="form-label">Versement annuel (optionnel)</label>
                 <input
                   type="number"
@@ -565,9 +580,15 @@ export default function EnveloppesPage() {
             let versements: number;
             
             if (envelope.annual_versement !== null && envelope.annual_versement !== undefined && envelope.open_year !== null && envelope.open_year !== undefined) {
-              // Calculate total versements based on annual contribution since open year
-              const yearsCount = currentYear - envelope.open_year + 1;
-              versements = envelope.annual_versement * yearsCount;
+              // Calculate total versements based on annual contribution since open year + initial amount
+              // Formula: Initial + (Annual * (current - open))
+              // If current == open, it's just Initial.
+              // Wait, user example: 2023 open (6000 initial). 2024 (150 annual).
+              // 2023: 6000 + 150*0 = 6000.
+              // 2024: 6000 + 150*1 = 6150.
+              
+              const yearsCount = Math.max(0, currentYear - envelope.open_year);
+              versements = (Number(envelope.initial_amount) || 0) + (envelope.annual_versement * yearsCount);
             } else {
               // Use cumulative versements
               versements = Number(envelope.year_versements) || 0;
@@ -584,7 +605,7 @@ export default function EnveloppesPage() {
                       {formatAmount(versements)} versés
                       {envelope.annual_versement !== null && envelope.annual_versement !== undefined && envelope.open_year !== null && (
                         <span style={{ fontSize: '0.75rem', marginLeft: '0.25rem' }}>
-                          ({formatAmount(envelope.annual_versement)}/an × {currentYear - envelope.open_year + 1} ans)
+                          ({formatAmount(envelope.initial_amount || 0)} + {formatAmount(envelope.annual_versement)}/an × {Math.max(0, currentYear - envelope.open_year)} ans)
                         </span>
                       )}
                     </span>
@@ -598,6 +619,7 @@ export default function EnveloppesPage() {
                         setEditEnvelopeVersements(envelope.year_versements?.toString() || '0');
                         setEditAnnualVersement(envelope.annual_versement?.toString() || '');
                         setEditOpenYear(envelope.open_year?.toString() || '');
+                        setEditInitialAmount(envelope.initial_amount?.toString() || '');
                         setEditExcludeFromGains(envelope.exclude_from_gains || false);
                         setShowEditEnvelope(true);
                       }}

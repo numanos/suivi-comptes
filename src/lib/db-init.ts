@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS envelopes (
   closed_year INT DEFAULT NULL,
   annual_versement DECIMAL(12,2) DEFAULT NULL,
   open_year INT DEFAULT NULL,
+  initial_amount DECIMAL(12,2) DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

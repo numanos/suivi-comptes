@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       let envelopes: any[];
       try {
         envelopes = await query(`
-          SELECT e.id, e.name, e.exclude_from_gains, e.closed_year, e.annual_versement, e.open_year,
+          SELECT e.id, e.name, e.exclude_from_gains, e.closed_year, e.annual_versement, e.open_year, e.initial_amount,
                  ev.versements as year_versements,
                  p.id as placement_id, p.name as placement_name, 
                  p.type_placement, p.year, p.valorization
@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
         `, [targetYear, targetYear, targetYear]) as any[];
       } catch (error: any) {
         if (error.code === 'ER_BAD_FIELD_ERROR') {
-          // Try without open_year
+          // Try without initial_amount
           try {
             envelopes = await query(`
-              SELECT e.id, e.name, e.exclude_from_gains, e.closed_year, e.annual_versement,
+              SELECT e.id, e.name, e.exclude_from_gains, e.closed_year, e.annual_versement, e.open_year,
                      ev.versements as year_versements,
                      p.id as placement_id, p.name as placement_name, 
                      p.type_placement, p.year, p.valorization
@@ -40,52 +40,72 @@ export async function GET(request: NextRequest) {
               ORDER BY e.name
             `, [targetYear, targetYear, targetYear]) as any[];
           } catch (error2: any) {
-            if (error2.code === 'ER_BAD_FIELD_ERROR' && error2.sqlMessage?.includes('closed_year')) {
-              // Fallback: query without closed_year column
-              try {
-                envelopes = await query(`
-                  SELECT e.id, e.name, e.exclude_from_gains, e.annual_versement,
-                         ev.versements as year_versements,
-                         p.id as placement_id, p.name as placement_name, 
-                         p.type_placement, p.year, p.valorization
-                  FROM envelopes e
-                  LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-                  LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-                  ORDER BY e.name
-                `, [targetYear, targetYear]) as any[];
-              } catch (error3: any) {
-                if (error3.code === 'ER_BAD_FIELD_ERROR' && error3.sqlMessage?.includes('annual_versement')) {
-                  // Fallback: query without annual_versement column
-                  envelopes = await query(`
-                    SELECT e.id, e.name, e.exclude_from_gains,
-                           ev.versements as year_versements,
-                           p.id as placement_id, p.name as placement_name, 
-                           p.type_placement, p.year, p.valorization
-                    FROM envelopes e
-                    LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-                    LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-                    ORDER BY e.name
-                  `, [targetYear, targetYear]) as any[];
-                } else {
-                  throw error3;
-                }
-              }
-            } else if (error2.code === 'ER_BAD_FIELD_ERROR' && error2.sqlMessage?.includes('annual_versement')) {
-              // Fallback: query without annual_versement column
-              envelopes = await query(`
-                SELECT e.id, e.name, e.exclude_from_gains, e.closed_year,
-                       ev.versements as year_versements,
-                       p.id as placement_id, p.name as placement_name, 
-                       p.type_placement, p.year, p.valorization
-                FROM envelopes e
-                LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
-                LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
-                WHERE e.closed_year IS NULL OR e.closed_year > ?
-                ORDER BY e.name
-              `, [targetYear, targetYear, targetYear]) as any[];
-            } else {
-              throw error2;
-            }
+            // ... existing fallbacks ...
+             if (error2.code === 'ER_BAD_FIELD_ERROR') {
+               // Try without open_year
+               try {
+                 envelopes = await query(`
+                   SELECT e.id, e.name, e.exclude_from_gains, e.closed_year, e.annual_versement,
+                          ev.versements as year_versements,
+                          p.id as placement_id, p.name as placement_name, 
+                          p.type_placement, p.year, p.valorization
+                   FROM envelopes e
+                   LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
+                   LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+                   WHERE e.closed_year IS NULL OR e.closed_year > ?
+                   ORDER BY e.name
+                 `, [targetYear, targetYear, targetYear]) as any[];
+               } catch (error3: any) {
+                 if (error3.code === 'ER_BAD_FIELD_ERROR' && error3.sqlMessage?.includes('closed_year')) {
+                    // Fallback: query without closed_year column
+                    try {
+                      envelopes = await query(`
+                        SELECT e.id, e.name, e.exclude_from_gains, e.annual_versement,
+                               ev.versements as year_versements,
+                               p.id as placement_id, p.name as placement_name, 
+                               p.type_placement, p.year, p.valorization
+                        FROM envelopes e
+                        LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
+                        LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+                        ORDER BY e.name
+                      `, [targetYear, targetYear]) as any[];
+                    } catch (error4: any) {
+                       if (error4.code === 'ER_BAD_FIELD_ERROR' && error4.sqlMessage?.includes('annual_versement')) {
+                         // Fallback: query without annual_versement column
+                         envelopes = await query(`
+                           SELECT e.id, e.name, e.exclude_from_gains,
+                                  ev.versements as year_versements,
+                                  p.id as placement_id, p.name as placement_name, 
+                                  p.type_placement, p.year, p.valorization
+                           FROM envelopes e
+                           LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
+                           LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+                           ORDER BY e.name
+                         `, [targetYear, targetYear]) as any[];
+                       } else {
+                         throw error4;
+                       }
+                    }
+                 } else if (error3.code === 'ER_BAD_FIELD_ERROR' && error3.sqlMessage?.includes('annual_versement')) {
+                   // Fallback: query without annual_versement column
+                   envelopes = await query(`
+                     SELECT e.id, e.name, e.exclude_from_gains, e.closed_year,
+                            ev.versements as year_versements,
+                            p.id as placement_id, p.name as placement_name, 
+                            p.type_placement, p.year, p.valorization
+                     FROM envelopes e
+                     LEFT JOIN envelope_versements ev ON ev.envelope_id = e.id AND ev.year = ?
+                     LEFT JOIN placements p ON p.envelope_id = e.id AND p.year = ?
+                     WHERE e.closed_year IS NULL OR e.closed_year > ?
+                     ORDER BY e.name
+                   `, [targetYear, targetYear, targetYear]) as any[];
+                 } else {
+                   throw error3;
+                 }
+               }
+             } else {
+               throw error2;
+             }
           }
         } else {
           throw error;
@@ -102,6 +122,7 @@ export async function GET(request: NextRequest) {
             year_versements: row.year_versements || 0,
             annual_versement: row.annual_versement,
             open_year: row.open_year,
+            initial_amount: row.initial_amount || 0,
             placements: []
           });
         }
@@ -376,7 +397,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, name, exclude_from_gains, year, versements, close_envelope, annual_versement, open_year } = await request.json();
+    const { id, name, exclude_from_gains, year, versements, close_envelope, annual_versement, open_year, initial_amount } = await request.json();
 
     if (!id) {
       return NextResponse.json({ error: 'ID requis' }, { status: 400 });
@@ -384,45 +405,58 @@ export async function PUT(request: NextRequest) {
 
     try {
       await query(
-        'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ?, annual_versement = ?, open_year = ? WHERE id = ?',
-        [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, annual_versement !== undefined ? annual_versement : null, open_year ? parseInt(open_year) : null, id]
+        'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ?, annual_versement = ?, open_year = ?, initial_amount = ? WHERE id = ?',
+        [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, annual_versement !== undefined ? annual_versement : null, open_year ? parseInt(open_year) : null, initial_amount !== undefined ? parseFloat(initial_amount) : 0, id]
       );
     } catch (error: any) {
       if (error.code === 'ER_BAD_FIELD_ERROR') {
-        // Try without open_year
+        // Try without initial_amount
         try {
           await query(
-            'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ?, annual_versement = ? WHERE id = ?',
-            [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, annual_versement !== undefined ? annual_versement : null, id]
+            'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ?, annual_versement = ?, open_year = ? WHERE id = ?',
+            [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, annual_versement !== undefined ? annual_versement : null, open_year ? parseInt(open_year) : null, id]
           );
         } catch (error2: any) {
-          if (error2.code === 'ER_BAD_FIELD_ERROR' && error2.sqlMessage?.includes('closed_year')) {
-            // Fallback: update without closed_year column
-            try {
-              await query(
-                'UPDATE envelopes SET name = ?, exclude_from_gains = ?, annual_versement = ? WHERE id = ?',
-                [name || '', exclude_from_gains ? true : false, annual_versement !== undefined ? annual_versement : null, id]
-              );
-            } catch (error3: any) {
-               if (error3.code === 'ER_BAD_FIELD_ERROR' && error3.sqlMessage?.includes('annual_versement')) {
-                 // Fallback: update without annual_versement column
+            // ... existing fallbacks ...
+             if (error2.code === 'ER_BAD_FIELD_ERROR') {
+               // Try without open_year
+               try {
                  await query(
-                   'UPDATE envelopes SET name = ?, exclude_from_gains = ? WHERE id = ?',
-                   [name || '', exclude_from_gains ? true : false, id]
+                   'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ?, annual_versement = ? WHERE id = ?',
+                   [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, annual_versement !== undefined ? annual_versement : null, id]
                  );
-               } else {
-                 throw error3;
+               } catch (error3: any) {
+                 if (error3.code === 'ER_BAD_FIELD_ERROR' && error3.sqlMessage?.includes('closed_year')) {
+                   // Fallback: update without closed_year column
+                   try {
+                     await query(
+                       'UPDATE envelopes SET name = ?, exclude_from_gains = ?, annual_versement = ? WHERE id = ?',
+                       [name || '', exclude_from_gains ? true : false, annual_versement !== undefined ? annual_versement : null, id]
+                     );
+                   } catch (error4: any) {
+                      if (error4.code === 'ER_BAD_FIELD_ERROR' && error4.sqlMessage?.includes('annual_versement')) {
+                        // Fallback: update without annual_versement column
+                        await query(
+                          'UPDATE envelopes SET name = ?, exclude_from_gains = ? WHERE id = ?',
+                          [name || '', exclude_from_gains ? true : false, id]
+                        );
+                      } else {
+                        throw error4;
+                      }
+                   }
+                 } else if (error3.code === 'ER_BAD_FIELD_ERROR' && error3.sqlMessage?.includes('annual_versement')) {
+                   // Fallback: update without annual_versement column
+                   await query(
+                     'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ? WHERE id = ?',
+                     [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, id]
+                   );
+                 } else {
+                   throw error3;
+                 }
                }
-            }
-          } else if (error2.code === 'ER_BAD_FIELD_ERROR' && error2.sqlMessage?.includes('annual_versement')) {
-            // Fallback: update without annual_versement column
-            await query(
-              'UPDATE envelopes SET name = ?, exclude_from_gains = ?, closed_year = ? WHERE id = ?',
-              [name || '', exclude_from_gains ? true : false, close_envelope ? parseInt(year) : null, id]
-            );
-          } else {
-            throw error2;
-          }
+             } else {
+               throw error2;
+             }
         }
       } else {
         throw error;
