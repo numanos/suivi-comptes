@@ -433,7 +433,7 @@ export default function EnveloppesPage() {
                       setEditEnvelopeVersements((prevYearVersements + annual).toString());
                     }
                   }}
-                  placeholder={prevYearVersements > 0 ? `Calculé: ${prevYearVersements} + ..." : "Laissez vide"}
+                  placeholder={prevYearVersements > 0 ? `Calculé: ${prevYearVersements} + ...` : "Laissez vide"}
                 />
                 <small style={{ color: 'var(--text-light)' }}>
                   {prevYearVersements > 0 
