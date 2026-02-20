@@ -194,9 +194,73 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ sankey: { nodes, links } });
     }
 
+    if (type === 'reports') {
+      const targetYear = year || new Date().getFullYear();
+      const month = searchParams.get('month');
+      
+      let dateFilter = 'YEAR(t.date) = ?';
+      const params: any[] = [targetYear];
+      
+      if (month && month !== 'all') {
+        dateFilter += ' AND MONTH(t.date) = ?';
+        params.push(month);
+      }
 
+      // 1. Distribution by Category (Expenses only)
+      const categories = await query(`
+        SELECT 
+          c.name, 
+          ABS(SUM(t.amount)) as value,
+          th.name as theme
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        JOIN themes th ON c.theme_id = th.id
+        WHERE ${dateFilter} AND t.amount < 0 AND th.name != 'Epargne'
+        GROUP BY c.id, c.name, th.name
+        ORDER BY value DESC
+      `, params) as any[];
+
+      // 2. Top Subcategories (Expenses only)
+      const subcategories = await query(`
+        SELECT 
+          s.name, 
+          c.name as category_name,
+          ABS(SUM(t.amount)) as value
+        FROM transactions t
+        JOIN subcategories s ON t.subcategory_id = s.id
+        JOIN categories c ON t.category_id = c.id
+        JOIN themes th ON c.theme_id = th.id
+        WHERE ${dateFilter} AND t.amount < 0 AND th.name != 'Epargne'
+        GROUP BY s.id, s.name, c.name
+        ORDER BY value DESC
+        LIMIT 15
+      `, params) as any[];
+
+      // 3. Thematic Totals
+      const themes = await query(`
+        SELECT 
+          SUM(CASE WHEN c.name = 'Alimentation' THEN ABS(t.amount) ELSE 0 END) as alimentation,
+          SUM(CASE WHEN c.name = 'Enfants & Scolarité' THEN ABS(t.amount) ELSE 0 END) as scolarite,
+          SUM(CASE WHEN c.name = 'Santé' THEN ABS(t.amount) ELSE 0 END) as sante,
+          SUM(CASE WHEN s.name LIKE '%Assurance%' OR c.name LIKE '%Assurance%' THEN ABS(t.amount) ELSE 0 END) as assurances,
+          SUM(CASE WHEN th.name = 'Epargne' THEN ABS(t.amount) ELSE 0 END) as epargne,
+          SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as revenus
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN subcategories s ON t.subcategory_id = s.id
+        LEFT JOIN themes th ON c.theme_id = th.id
+        WHERE ${dateFilter}
+      `, params) as any[];
+
+      return NextResponse.json({
+        categories,
+        subcategories,
+        thematic: themes[0] || {}
+      });
+    }
 
     return NextResponse.json({ error: 'Type requis' }, { status: 400 });
+
   } catch (error) {
     console.error('Error fetching summary:', error);
     return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 });
