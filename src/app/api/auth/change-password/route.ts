@@ -14,7 +14,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const authCookie = cookies().get('auth');
+    const cookieStore = await cookies();
+    const authCookie = cookieStore.get('auth');
     if (!authCookie) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }

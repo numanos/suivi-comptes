@@ -217,7 +217,7 @@ export default function RecapPage() {
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} padding={{ left: 20, right: 20 }} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Solde" stroke="#2563eb" strokeWidth={3} dot={false} connectNulls={false}>
@@ -236,7 +236,7 @@ export default function RecapPage() {
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} padding={{ left: 20, right: 20 }} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Revenus" stroke="#10b981" strokeWidth={3} dot={false} connectNulls={false}>
@@ -257,7 +257,7 @@ export default function RecapPage() {
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} padding={{ left: 20, right: 20 }} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Dépenses" stroke="#ef4444" strokeWidth={3} dot={false} connectNulls={false}>
@@ -276,7 +276,7 @@ export default function RecapPage() {
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} padding={{ left: 20, right: 20 }} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Épargne" stroke="#3b82f6" strokeWidth={3} dot={false} connectNulls={false}>
@@ -299,21 +299,19 @@ export default function RecapPage() {
                 data={sankeyData}
                 node={<SankeyNode containerWidth={1000} />}
                 margin={{ top: 40, right: 250, bottom: 40, left: 150 }}
-                nodePadding={60}
+                nodePadding={30}
                 nodeWidth={15}
                 link={(props: any) => {
-                  const { sourceX, sourceY, targetX, targetY, link, payload } = props;
-                  const strokeWidth = link?.width || props.width || 0;
-                  if (strokeWidth < 0.1) return <path d="" />;
+                  const { sourceX, sourceY, targetX, targetY, width, payload } = props;
+                  if (width < 1) return <path d="" />;
                   
-                  const sx = sourceX + 15;
                   return (
                     <path
-                      d={`M${sx},${sourceY}C${(sx + targetX) / 2},${sourceY} ${(sx + targetX) / 2},${targetY} ${targetX},${targetY}`}
+                      d={`M${sourceX},${sourceY}C${(sourceX + targetX) / 2},${sourceY} ${(sourceX + targetX) / 2},${targetY} ${targetX},${targetY}`}
                       fill="none"
                       stroke={payload?.color || "#cbd5e1"}
-                      strokeWidth={strokeWidth}
-                      strokeOpacity="0.2"
+                      strokeWidth={width}
+                      strokeOpacity="0.5"
                     />
                   );
                 }}
