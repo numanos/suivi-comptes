@@ -190,6 +190,7 @@ export async function GET(request: NextRequest) {
         links.push({ source: 2, target: nodeIdx, value: Number(sub.value), color: '#10b981' });
       });
 
+
       return NextResponse.json({ sankey: { nodes, links } });
     }
 

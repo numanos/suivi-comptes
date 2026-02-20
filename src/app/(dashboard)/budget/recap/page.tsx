@@ -343,10 +343,10 @@ export default function RecapPage() {
               <Sankey
                 data={sankeyData}
                 node={<SankeyNode containerWidth={1000} />}
-                link={<SankeyLink />}
                 margin={{ top: 40, right: 250, bottom: 40, left: 150 }}
                 nodePadding={60}
                 nodeWidth={15}
+                link={{ stroke: '#cbd5e1', strokeOpacity: 0.2, fillOpacity: 0.3 }}
               >
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
