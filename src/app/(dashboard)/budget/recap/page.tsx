@@ -74,21 +74,24 @@ const SankeyLink = (props: any) => {
   const { sourceX, sourceY, targetX, targetY, sy, ty, width, payload } = props;
   if (!width || width < 0.1) return null;
 
+  const nodeWidth = 15; // Doit correspondre à nodeWidth du composant Sankey
+  const sourceExitX = sourceX + nodeWidth;
+  
   return (
     <path
       d={`
-        M${sourceX},${sy}
-        C${(sourceX + targetX) / 2},${sy} 
-         ${(sourceX + targetX) / 2},${ty} 
+        M${sourceExitX},${sy}
+        C${(sourceExitX + targetX) / 2},${sy} 
+         ${(sourceExitX + targetX) / 2},${ty} 
          ${targetX},${ty}
         L${targetX},${ty + width}
-        C${(sourceX + targetX) / 2},${ty + width} 
-         ${(sourceX + targetX) / 2},${sy + width} 
-         ${sourceX},${sy + width}
+        C${(sourceExitX + targetX) / 2},${ty + width} 
+         ${(sourceExitX + targetX) / 2},${sy + width} 
+         ${sourceExitX},${sy + width}
         Z
       `}
-      fill={payload.source.color || "#cbd5e1"}
-      fillOpacity="0.25"
+      fill={payload.source.color || "#3b82f6"}
+      fillOpacity="0.2"
       stroke="none"
     />
   );
@@ -231,7 +234,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -256,7 +259,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -283,7 +286,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -308,7 +311,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 60, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -343,6 +346,7 @@ export default function RecapPage() {
                 nodePadding={60}
                 nodeWidth={15}
               >
+
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
             </ResponsiveContainer>
