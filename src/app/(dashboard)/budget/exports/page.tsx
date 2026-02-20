@@ -73,6 +73,7 @@ export default function ExportsPage() {
     if (!reportData) return;
 
     const doc = new jsPDF();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const period = selectedMonth === 'all' 
       ? `Année ${selectedYear}` 
       : `${monthNames[parseInt(selectedMonth) - 1]} ${selectedYear}`;
@@ -131,7 +132,13 @@ export default function ExportsPage() {
     });
 
     // Thematic Focus
-    const currentY = (doc as any).lastAutoTable.finalY + 15;
+    let currentY = (doc as any).lastAutoTable.finalY + 15;
+    
+    if (currentY > pageHeight - 40) {
+      doc.addPage();
+      currentY = 20;
+    }
+
     doc.setFontSize(16);
     doc.text('Focus thématiques', 14, currentY);
 
@@ -151,7 +158,14 @@ export default function ExportsPage() {
     });
 
     // Top Subcategories
-    const subY = (doc as any).lastAutoTable.finalY + 15;
+    let subY = (doc as any).lastAutoTable.finalY + 15;
+    
+    // Si on est trop bas (moins de 40mm du bord), on change de page
+    if (subY > pageHeight - 40) {
+      doc.addPage();
+      subY = 20;
+    }
+
     doc.setFontSize(16);
     doc.text('Top 15 des dépenses détaillées', 14, subY);
 
