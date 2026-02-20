@@ -29,40 +29,49 @@ export async function GET(request: NextRequest) {
 
       console.log('Monthly rows:', rows);
 
-      const summary = rows.map(row => ({
-        month: row.month,
-        year: row.year,
-        total_expenses: row.total_expenses || 0,
-        total_income: row.total_income || 0,
-        total_savings: row.total_savings || 0,
-        net: (row.total_income || 0) - (row.total_expenses || 0),
-        balance: null as number | null
-      }));
+      // 1. Get initial balance (last known balance before this year)
+      const initialBalanceRows = await query(`
+        SELECT balance FROM transactions 
+        WHERE date < ? AND balance IS NOT NULL 
+        ORDER BY date DESC, id DESC LIMIT 1
+      `, [`${targetYear}-01-01`]) as any[];
+      
+      let runningBalance = initialBalanceRows.length > 0 ? Number(initialBalanceRows[0].balance) : 0;
 
-      // Get balance for each month (last transaction with balance for that month)
+      // 2. Get last balance of each month for the target year
       const balanceRows = await query(`
         SELECT 
           MONTH(t.date) as month,
-          YEAR(t.date) as year,
           t.balance
         FROM transactions t
         WHERE YEAR(t.date) = ? AND t.balance IS NOT NULL
-        ORDER BY year, month, t.date DESC
+        ORDER BY t.date ASC, t.id ASC
       `, [targetYear]) as any[];
 
-      // Get the last balance for each month
-      const lastBalanceByMonth = new Map<string, number>();
+      const lastBalanceByMonth = new Map<number, number>();
       for (const row of balanceRows) {
-        const key = `${row.year}-${row.month}`;
-        if (!lastBalanceByMonth.has(key)) {
-          lastBalanceByMonth.set(key, row.balance);
-        }
+        lastBalanceByMonth.set(row.month, Number(row.balance));
       }
 
-      // Merge balance into summary
-      for (const row of summary) {
-        const key = `${row.year}-${row.month}`;
-        row.balance = lastBalanceByMonth.get(key) || null;
+      // 3. Merge and fill gaps in summary
+      const summary = [];
+      for (let m = 1; m <= 12; m++) {
+        const row = rows.find(r => r.month === m);
+        const monthBalance = lastBalanceByMonth.get(m);
+        
+        if (monthBalance !== undefined) {
+          runningBalance = monthBalance;
+        }
+
+        summary.push({
+          month: m,
+          year: Number(targetYear),
+          total_expenses: row ? (Number(row.total_expenses) || 0) : 0,
+          total_income: row ? (Number(row.total_income) || 0) : 0,
+          total_savings: row ? (Number(row.total_savings) || 0) : 0,
+          net: row ? (Number(row.total_income) || 0) - (Number(row.total_expenses) || 0) : 0,
+          balance: runningBalance
+        });
       }
 
       return NextResponse.json(summary);
@@ -118,19 +127,57 @@ export async function GET(request: NextRequest) {
 
     if (type === 'distribution') {
       const targetYear = year || new Date().getFullYear();
-      const rows = await query(`
+      
+      // Get category totals for Pie Chart
+      const catRows = await query(`
         SELECT 
           c.name as name,
-          th.name as theme,
           SUM(ABS(t.amount)) as value
         FROM transactions t
         JOIN categories c ON t.category_id = c.id
         JOIN themes th ON c.theme_id = th.id
         WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name IN ('Dépenses fixes', 'Dépenses variables')
-        GROUP BY c.id, th.id
+        GROUP BY c.id
         ORDER BY value DESC
       `, [targetYear]) as any[];
-      return NextResponse.json(rows);
+
+      // Get category -> subcategory links for Sankey
+      const sankeyRows = await query(`
+        SELECT 
+          c.name as source,
+          COALESCE(s.name, 'Autres') as target,
+          SUM(ABS(t.amount)) as value
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        JOIN themes th ON c.theme_id = th.id
+        LEFT JOIN subcategories s ON t.subcategory_id = s.id
+        WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name IN ('Dépenses fixes', 'Dépenses variables')
+        GROUP BY c.id, s.id
+        HAVING value > 0
+        ORDER BY c.name, target
+      `, [targetYear]) as any[];
+
+      // Format for Sankey (nodes and links)
+      const nodesMap = new Map();
+      const links: any[] = [];
+      
+      sankeyRows.forEach((row: any) => {
+        if (!nodesMap.has(row.source)) nodesMap.set(row.source, nodesMap.size);
+        if (!nodesMap.has(row.target)) nodesMap.set(row.target, nodesMap.size);
+        
+        links.push({
+          source: nodesMap.get(row.source),
+          target: nodesMap.get(row.target),
+          value: Number(row.value)
+        });
+      });
+
+      const nodes = Array.from(nodesMap.keys()).map(name => ({ name }));
+
+      return NextResponse.json({
+        categories: catRows,
+        sankey: { nodes, links }
+      });
     }
 
     return NextResponse.json({ error: 'Type requis' }, { status: 400 });
