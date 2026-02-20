@@ -74,9 +74,10 @@ const SankeyLink = (props: any) => {
   const { sourceX, sourceY, targetX, targetY, sy, ty, width, payload } = props;
   if (!width || width < 0.1) return null;
 
-  const nodeWidth = 15; // Doit correspondre à nodeWidth du composant Sankey
+  const nodeWidth = 15;
   const sourceExitX = sourceX + nodeWidth;
   
+  // Correction: Utilisation de courbes Bézier cubiques plus larges pour l'effet "ruban"
   return (
     <path
       d={`
@@ -91,8 +92,10 @@ const SankeyLink = (props: any) => {
         Z
       `}
       fill={payload.source.color || "#3b82f6"}
-      fillOpacity="0.2"
-      stroke="none"
+      fillOpacity="0.3"
+      stroke={payload.source.color || "#3b82f6"}
+      strokeOpacity="0.1"
+      strokeWidth="1"
     />
   );
 };
