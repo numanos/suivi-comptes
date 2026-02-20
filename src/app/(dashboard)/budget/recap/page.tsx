@@ -303,14 +303,16 @@ export default function RecapPage() {
                 nodeWidth={15}
                 link={(props: any) => {
                   const { sourceX, sourceY, targetX, targetY, link, payload } = props;
-                  if (!link.width || link.width < 0.1) return <path />;
+                  const strokeWidth = link?.width || props.width || 0;
+                  if (strokeWidth < 0.1) return <path d="" />;
+                  
                   const sx = sourceX + 15;
                   return (
                     <path
                       d={`M${sx},${sourceY}C${(sx + targetX) / 2},${sourceY} ${(sx + targetX) / 2},${targetY} ${targetX},${targetY}`}
                       fill="none"
-                      stroke={payload.color || "#cbd5e1"}
-                      strokeWidth={link.width}
+                      stroke={payload?.color || "#cbd5e1"}
+                      strokeWidth={strokeWidth}
                       strokeOpacity="0.2"
                     />
                   );
