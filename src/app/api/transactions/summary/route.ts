@@ -175,19 +175,19 @@ export async function GET(request: NextRequest) {
       const links = [];
       
       // Level 1: Revenus -> Mid
-      if (totalExpenses > 0) links.push({ source: 0, target: 1, value: totalExpenses });
-      if (savings > 0) links.push({ source: 0, target: 2, value: savings });
-      if (remaining > 0) links.push({ source: 0, target: 3, value: remaining });
+      if (totalExpenses > 0) links.push({ source: 0, target: 1, value: totalExpenses, color: '#f97316' });
+      if (savings > 0) links.push({ source: 0, target: 2, value: savings, color: '#10b981' });
+      if (remaining > 0) links.push({ source: 0, target: 3, value: remaining, color: '#6366f1' });
 
       // Level 2: Dépenses -> Breakdown
-      if (fixed > 0) links.push({ source: 1, target: 4, value: fixed });
-      if (variable > 0) links.push({ source: 1, target: 5, value: variable });
+      if (fixed > 0) links.push({ source: 1, target: 4, value: fixed, color: '#ea580c' });
+      if (variable > 0) links.push({ source: 1, target: 5, value: variable, color: '#f59e0b' });
 
       // Level 2: Épargne -> Subcategories
       savingsSubCats.forEach((sub: any) => {
         const nodeIdx = nodes.length;
         nodes.push({ name: sub.name, color: '#059669', amount: Number(sub.value) });
-        links.push({ source: 2, target: nodeIdx, value: Number(sub.value) });
+        links.push({ source: 2, target: nodeIdx, value: Number(sub.value), color: '#10b981' });
       });
 
       return NextResponse.json({ sankey: { nodes, links } });

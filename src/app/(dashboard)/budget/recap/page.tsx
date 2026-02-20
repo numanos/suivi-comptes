@@ -19,7 +19,7 @@ interface AnnualData {
 interface DistributionData {
   sankey: {
     nodes: { name: string; color?: string; amount: number }[];
-    links: { source: number; target: number; value: number }[];
+    links: { source: number; target: number; value: number; color?: string }[];
   };
 }
 
@@ -70,6 +70,7 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
   );
 };
 
+// Composant de lien personnalisé pour garantir l'épaisseur et la couleur
 const SankeyLink = (props: any) => {
   const { sourceX, sourceY, targetX, targetY, sy, ty, width, payload } = props;
   if (!width || width < 0.1) return null;
@@ -77,7 +78,6 @@ const SankeyLink = (props: any) => {
   const nodeWidth = 15;
   const sourceExitX = sourceX + nodeWidth;
   
-  // Correction: Utilisation de courbes Bézier cubiques plus larges pour l'effet "ruban"
   return (
     <path
       d={`
@@ -91,11 +91,10 @@ const SankeyLink = (props: any) => {
          ${sourceExitX},${sy + width}
         Z
       `}
-      fill={payload.source.color || "#3b82f6"}
+      fill={payload.color || payload.source.color || "#cbd5e1"}
       fillOpacity="0.3"
-      stroke={payload.source.color || "#3b82f6"}
+      stroke={payload.color || payload.source.color || "#cbd5e1"}
       strokeOpacity="0.1"
-      strokeWidth="1"
     />
   );
 };
@@ -349,7 +348,6 @@ export default function RecapPage() {
                 nodePadding={60}
                 nodeWidth={15}
               >
-
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
             </ResponsiveContainer>
