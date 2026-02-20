@@ -48,6 +48,7 @@ export default function BudgetPage() {
   const [editSubcategoryId, setEditSubcategoryId] = useState<number | null>(null);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<any>(null);
+  const [selectedDuplicates, setSelectedDuplicates] = useState<number[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [pagination, setPagination] = useState({ total: 0, limit: 50, offset: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -137,24 +138,25 @@ export default function BudgetPage() {
 
       if (data.dryRun && data.duplicatesCount > 0) {
         setDuplicateInfo(data);
+        setSelectedDuplicates([]); // None selected by default
         setShowDuplicateModal(true);
         setImporting(false);
         return;
       }
 
-      await doImport(file, true);
+      await doImport(file, []);
     } catch (error) {
       setImportResult({ error: 'Erreur lors de l\'import' });
       setImporting(false);
     }
   };
 
-  const doImport = async (file: File, skipDuplicates: boolean) => {
+  const doImport = async (file: File, selectedIndices: number[]) => {
     setImporting(true);
     const formData = new FormData();
     formData.append('file', file);
     formData.append('dryRun', 'false');
-    formData.append('skipDuplicates', skipDuplicates.toString());
+    formData.append('selectedDuplicates', JSON.stringify(selectedIndices));
 
     try {
       const res = await fetch('/api/transactions', {
@@ -550,50 +552,75 @@ export default function BudgetPage() {
               <button className="modal-close" onClick={() => setShowDuplicateModal(false)}>&times;</button>
             </div>
             <div style={{ marginBottom: '1rem' }}>
-              <p><strong>{duplicateInfo.duplicatesCount}</strong> doublon(s) détecté(s) dans le fichier CSV.</p>
-              <p>Ces transactions ont le même date + libellé + montant.</p>
+              <p><strong>{duplicateInfo.duplicatesCount}</strong> doublon(s) détecté(s) (déjà présents en base ou plusieurs fois dans le fichier).</p>
+              <p>Cochez les lignes que vous souhaitez <strong>importer quand même</strong> :</p>
             </div>
             <div style={{ maxHeight: '300px', overflowY: 'auto', marginBottom: '1rem', border: '1px solid #ddd' }}>
               <table className="table" style={{ fontSize: '0.8rem' }}>
                 <thead>
                   <tr>
+                    <th style={{ width: '40px' }}>
+                      <input 
+                        type="checkbox" 
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedDuplicates(duplicateInfo.duplicates.map((d: any) => d.rowIndex));
+                          } else {
+                            setSelectedDuplicates([]);
+                          }
+                        }}
+                        checked={selectedDuplicates.length === duplicateInfo.duplicates?.length && duplicateInfo.duplicates?.length > 0}
+                      />
+                    </th>
                     <th>Date</th>
                     <th>Libellé</th>
                     <th>Montant</th>
+                    <th>Type</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {duplicateInfo.duplicatesInFile?.map((d: any, i: number) => (
-                    <tr key={i}>
-                      <td>{d.date}</td>
+                  {duplicateInfo.duplicates?.map((d: any, i: number) => (
+                    <tr key={i} onClick={() => {
+                      setSelectedDuplicates(prev => 
+                        prev.includes(d.rowIndex) ? prev.filter(idx => idx !== d.rowIndex) : [...prev, d.rowIndex]
+                      );
+                    }} style={{ cursor: 'pointer' }}>
+                      <td>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedDuplicates.includes(d.rowIndex)}
+                          onChange={() => {}} // Handled by tr onClick
+                        />
+                      </td>
+                      <td>{new Date(d.date).toLocaleDateString('fr-FR')}</td>
                       <td>{d.libelle}</td>
-                      <td>{d.amount}</td>
+                      <td>{formatAmount(d.amount)}</td>
+                      <td>
+                        <span className={`badge ${d.type === 'database' ? 'badge-danger' : 'badge-warning'}`}>
+                          {d.type === 'database' ? 'En base' : 'Dans fichier'}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => doImport(fileInputRef.current?.files?.[0]!, true)}
-                disabled={importing}
-              >
-                Importer en ignorant les doublons
-              </button>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <button 
                 className="btn btn-secondary" 
-                onClick={() => doImport(fileInputRef.current?.files?.[0]!, false)}
-                disabled={importing}
-              >
-                Importer quand même (toutes les lignes)
-              </button>
-              <button 
-                className="btn btn-danger" 
                 onClick={() => setShowDuplicateModal(false)}
                 disabled={importing}
               >
                 Annuler
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => doImport(fileInputRef.current?.files?.[0]!, selectedDuplicates)}
+                disabled={importing}
+              >
+                {selectedDuplicates.length > 0 
+                  ? `Importer (${duplicateInfo.uniqueRows} uniques + ${selectedDuplicates.length} doublons)` 
+                  : `Importer uniquement les ${duplicateInfo.uniqueRows} nouvelles lignes`}
               </button>
             </div>
           </div>
