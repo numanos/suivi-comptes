@@ -29,6 +29,9 @@ const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#64748b', '#8b5cf6', '#ec4899'
 
 const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any) => {
   const isOut = x > containerWidth / 2;
+  // Don't show labels for very small nodes to avoid clutter
+  if (height < 10) return <rect x={x} y={y} width={width} height={height} fill="#2563eb" fillOpacity="0.8" />;
+  
   return (
     <g>
       <rect
@@ -43,9 +46,10 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
         x={isOut ? x - 6 : x + width + 6}
         y={y + height / 2}
         textAnchor={isOut ? 'end' : 'start'}
-        verticalAnchor="middle"
-        fontSize="12"
+        dominantBaseline="middle"
+        fontSize="11"
         fill="#333"
+        fontWeight="500"
       >
         {payload.name}
       </text>
@@ -60,6 +64,9 @@ export default function RecapPage() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
 
   const formatAmount = (amount: number | null | undefined) => {
     if (amount === null || amount === undefined || isNaN(amount)) return '0,00 €';
@@ -99,21 +106,50 @@ export default function RecapPage() {
   }, [selectedYear]);
 
   const safeMonthlyData = Array.isArray(monthlyData) ? monthlyData : [];
-  const ytdExpenses = safeMonthlyData.reduce((sum, d) => sum + (Number(d.total_expenses) || 0), 0);
-  const ytdIncome = safeMonthlyData.reduce((sum, d) => sum + (Number(d.total_income) || 0), 0);
-  const ytdSavings = safeMonthlyData.reduce((sum, d) => sum + (Number(d.total_savings) || 0), 0);
-  const lastBalance = safeMonthlyData.length > 0 ? safeMonthlyData[safeMonthlyData.length - 1].balance : 0;
+  
+  // Find last month with transactions or balance change
+  const lastMonthWithData = safeMonthlyData.reduce((last, d, idx) => {
+    const hasData = Number(d.total_expenses) > 0 || Number(d.total_income) > 0;
+    // For current year, we stop at current month anyway, but only if it's not the future
+    if (selectedYear === currentYear) {
+      return hasData && (idx + 1) <= currentMonth ? idx + 1 : last;
+    }
+    return hasData ? idx + 1 : last;
+  }, 0);
 
-  const chartData = safeMonthlyData.map(d => ({
-    name: monthNames[d.month - 1],
-    Dépenses: Number(d.total_expenses) || 0,
-    Revenus: Number(d.total_income) || 0,
-    Épargne: Number(d.total_savings) || 0,
-    Solde: d.balance
-  }));
+  const ytdExpenses = safeMonthlyData.reduce((sum, d, idx) => 
+    idx + 1 <= lastMonthWithData ? sum + (Number(d.total_expenses) || 0) : sum, 0);
+  const ytdIncome = safeMonthlyData.reduce((sum, d, idx) => 
+    idx + 1 <= lastMonthWithData ? sum + (Number(d.total_income) || 0) : sum, 0);
+  const ytdSavings = safeMonthlyData.reduce((sum, d, idx) => 
+    idx + 1 <= lastMonthWithData ? sum + (Number(d.total_savings) || 0) : sum, 0);
+  const lastBalance = lastMonthWithData > 0 ? safeMonthlyData[lastMonthWithData - 1].balance : 0;
+
+  const chartData = safeMonthlyData.map((d, idx) => {
+    const isFuture = idx + 1 > lastMonthWithData;
+    return {
+      name: monthNames[d.month - 1],
+      Dépenses: isFuture ? null : Number(d.total_expenses) || 0,
+      Revenus: isFuture ? null : Number(d.total_income) || 0,
+      Épargne: isFuture ? null : Number(d.total_savings) || 0,
+      Solde: isFuture ? null : d.balance
+    };
+  });
 
   const pieData = distributionData?.categories?.filter(c => c.value > 0).slice(0, 10) || [];
-  const sankeyData = distributionData?.sankey || { nodes: [], links: [] };
+  
+  // Clean Sankey data: remove very small links to avoid clutter
+  const rawSankey = distributionData?.sankey || { nodes: [], links: [] };
+  const filteredLinks = rawSankey.links.filter(l => l.value > 5); // Filter links < 5€
+  const activeNodeIndices = new Set(filteredLinks.flatMap(l => [l.source, l.target]));
+  const sankeyData = {
+    nodes: rawSankey.nodes.filter((_, idx) => activeNodeIndices.has(idx)),
+    links: filteredLinks.map(l => ({
+      ...l,
+      source: Array.from(activeNodeIndices).indexOf(l.source),
+      target: Array.from(activeNodeIndices).indexOf(l.target)
+    }))
+  };
 
   return (
     <div>
@@ -177,14 +213,20 @@ export default function RecapPage() {
             <h2 className="card-title">Soldes fin de mois</h2>
           </div>
           <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData} margin={{ top: 25, right: 30, left: 10, bottom: 5 }}>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Line type="monotone" dataKey="Solde" stroke="#2563eb" strokeWidth={3} dot={false}>
-                  <LabelList dataKey="Solde" position="top" offset={10} formatter={(v: number) => `${Math.round(v)}€`} style={{ fontSize: '11px', fontWeight: '500' }} />
+                <Line type="monotone" dataKey="Solde" stroke="#2563eb" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Solde" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} 
+                  />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -196,14 +238,20 @@ export default function RecapPage() {
             <h2 className="card-title">Courbe des revenus</h2>
           </div>
           <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData} margin={{ top: 25, right: 30, left: 10, bottom: 5 }}>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Line type="monotone" dataKey="Revenus" stroke="#10b981" strokeWidth={3} dot={false}>
-                  <LabelList dataKey="Revenus" position="top" offset={10} formatter={(v: number) => `${Math.round(v)}€`} style={{ fontSize: '11px', fontWeight: '500' }} />
+                <Line type="monotone" dataKey="Revenus" stroke="#10b981" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Revenus" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#065f46' }} 
+                  />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -218,14 +266,20 @@ export default function RecapPage() {
             <h2 className="card-title">Courbe des dépenses</h2>
           </div>
           <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData} margin={{ top: 25, right: 30, left: 10, bottom: 5 }}>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Line type="monotone" dataKey="Dépenses" stroke="#ef4444" strokeWidth={3} dot={false}>
-                  <LabelList dataKey="Dépenses" position="top" offset={10} formatter={(v: number) => `${Math.round(v)}€`} style={{ fontSize: '11px', fontWeight: '500' }} />
+                <Line type="monotone" dataKey="Dépenses" stroke="#ef4444" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Dépenses" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#991b1b' }} 
+                  />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -237,14 +291,20 @@ export default function RecapPage() {
             <h2 className="card-title">Courbe de l'épargne</h2>
           </div>
           <div className="chart-container">
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData} margin={{ top: 25, right: 30, left: 10, bottom: 5 }}>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Line type="monotone" dataKey="Épargne" stroke="#3b82f6" strokeWidth={3} dot={false}>
-                  <LabelList dataKey="Épargne" position="top" offset={10} formatter={(v: number) => `${Math.round(v)}€`} style={{ fontSize: '11px', fontWeight: '500' }} />
+                <Line type="monotone" dataKey="Épargne" stroke="#3b82f6" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Épargne" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} 
+                  />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -262,7 +322,7 @@ export default function RecapPage() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Legend />
@@ -312,15 +372,15 @@ export default function RecapPage() {
         <div className="card-header">
           <h2 className="card-title">Détail des flux (Catégories & Sous-catégories)</h2>
         </div>
-        <div className="chart-container" style={{ height: 500, padding: '1rem' }}>
+        <div className="chart-container" style={{ height: 600, padding: '1rem' }}>
           {sankeyData.links.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <Sankey
                 data={sankeyData}
                 node={<SankeyNode containerWidth={1000} />}
-                link={{ stroke: '#cbd5e1', strokeWidth: 2, fillOpacity: 0.2 }}
-                margin={{ top: 20, right: 160, bottom: 20, left: 20 }}
-                nodePadding={50}
+                link={{ stroke: '#cbd5e1', strokeWidth: 2, fillOpacity: 0.1 }}
+                margin={{ top: 20, right: 200, bottom: 20, left: 100 }}
+                nodePadding={30}
               >
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
@@ -351,18 +411,18 @@ export default function RecapPage() {
               </tr>
             </thead>
             <tbody>
-              {chartData.map((d, idx) => (
-                <tr key={d.name}>
-                  <td>{d.name}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(d.Dépenses)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(d.Revenus)}</td>
-                  <td style={{ textAlign: 'right' }}>{formatAmount(d.Épargne)}</td>
+              {safeMonthlyData.map((d, idx) => (
+                <tr key={d.month} style={{ opacity: idx + 1 > lastMonthWithData ? 0.5 : 1 }}>
+                  <td>{monthNames[d.month - 1]}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(d.total_expenses)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(d.total_income)}</td>
+                  <td style={{ textAlign: 'right' }}>{formatAmount(d.total_savings)}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <span className={d.Revenus - d.Dépenses >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
-                      {formatAmount(d.Revenus - d.Dépenses)}
+                    <span className={d.total_income - d.total_expenses >= 0 ? 'badge badge-success' : 'badge badge-danger'}>
+                      {formatAmount(d.total_income - d.total_expenses)}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatAmount(d.Solde)}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatAmount(d.balance)}</td>
                 </tr>
               ))}
             </tbody>

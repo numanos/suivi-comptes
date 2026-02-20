@@ -128,6 +128,20 @@ export async function GET(request: NextRequest) {
     if (type === 'distribution') {
       const targetYear = year || new Date().getFullYear();
       
+      // First, find theme IDs for expenses to be more robust
+      const expenseThemes = await query(`
+        SELECT id FROM themes 
+        WHERE name LIKE '%Dépense%' OR name LIKE '%Depense%'
+      `) as any[];
+      
+      const themeIds = expenseThemes.map(t => t.id);
+      
+      if (themeIds.length === 0) {
+        return NextResponse.json({ categories: [], sankey: { nodes: [], links: [] } });
+      }
+
+      const themePlaceholders = themeIds.map(() => '?').join(',');
+
       // Get category totals for Pie Chart
       const catRows = await query(`
         SELECT 
@@ -135,11 +149,10 @@ export async function GET(request: NextRequest) {
           SUM(ABS(t.amount)) as value
         FROM transactions t
         JOIN categories c ON t.category_id = c.id
-        JOIN themes th ON c.theme_id = th.id
-        WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name IN ('Dépenses fixes', 'Dépenses variables')
+        WHERE YEAR(t.date) = ? AND t.amount < 0 AND c.theme_id IN (${themePlaceholders})
         GROUP BY c.id
         ORDER BY value DESC
-      `, [targetYear]) as any[];
+      `, [targetYear, ...themeIds]) as any[];
 
       // Get category -> subcategory links for Sankey
       const sankeyRows = await query(`
@@ -149,13 +162,12 @@ export async function GET(request: NextRequest) {
           SUM(ABS(t.amount)) as value
         FROM transactions t
         JOIN categories c ON t.category_id = c.id
-        JOIN themes th ON c.theme_id = th.id
         LEFT JOIN subcategories s ON t.subcategory_id = s.id
-        WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name IN ('Dépenses fixes', 'Dépenses variables')
+        WHERE YEAR(t.date) = ? AND t.amount < 0 AND c.theme_id IN (${themePlaceholders})
         GROUP BY c.id, s.id
         HAVING value > 0
-        ORDER BY c.name, target
-      `, [targetYear]) as any[];
+        ORDER BY value DESC
+      `, [targetYear, ...themeIds]) as any[];
 
       // Format for Sankey (nodes and links)
       const nodesMap = new Map();
