@@ -42,25 +42,25 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
         height={height}
         fill={payload.color || "#2563eb"}
         fillOpacity="1"
-        rx={2}
+        rx={3}
       />
       <text
-        x={isOut ? x - 12 : x + width + 12}
+        x={isOut ? x - 15 : x + width + 15}
         y={y + height / 2 - 8}
         textAnchor={isOut ? 'end' : 'start'}
         dominantBaseline="middle"
-        fontSize="12"
-        fill="#111827"
+        fontSize="13"
+        fill="#1f2937"
         fontWeight="bold"
       >
         {payload.name}
       </text>
       <text
-        x={isOut ? x - 12 : x + width + 12}
+        x={isOut ? x - 15 : x + width + 15}
         y={y + height / 2 + 10}
         textAnchor={isOut ? 'end' : 'start'}
         dominantBaseline="middle"
-        fontSize="11"
+        fontSize="12"
         fill={payload.color || "#2563eb"}
         fontWeight="600"
       >
@@ -70,8 +70,31 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
   );
 };
 
-export default function RecapPage() {
+const SankeyLink = (props: any) => {
+  const { sourceX, sourceY, targetX, targetY, sy, ty, width, payload } = props;
+  if (!width || width < 0.1) return null;
 
+  return (
+    <path
+      d={`
+        M${sourceX},${sy}
+        C${(sourceX + targetX) / 2},${sy} 
+         ${(sourceX + targetX) / 2},${ty} 
+         ${targetX},${ty}
+        L${targetX},${ty + width}
+        C${(sourceX + targetX) / 2},${ty + width} 
+         ${(sourceX + targetX) / 2},${sy + width} 
+         ${sourceX},${sy + width}
+        Z
+      `}
+      fill={payload.source.color || "#cbd5e1"}
+      fillOpacity="0.25"
+      stroke="none"
+    />
+  );
+};
+
+export default function RecapPage() {
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [distributionData, setDistributionData] = useState<DistributionData | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -208,7 +231,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 40, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -233,7 +256,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 40, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -260,7 +283,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 40, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -285,7 +308,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 40, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 45, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -315,10 +338,10 @@ export default function RecapPage() {
               <Sankey
                 data={sankeyData}
                 node={<SankeyNode containerWidth={1000} />}
+                link={<SankeyLink />}
                 margin={{ top: 40, right: 250, bottom: 40, left: 150 }}
                 nodePadding={60}
                 nodeWidth={15}
-                link={{ stroke: '#cbd5e1', strokeWidth: 0, fillOpacity: 0.2 }}
               >
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
