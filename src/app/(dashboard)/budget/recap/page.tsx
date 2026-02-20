@@ -301,23 +301,6 @@ export default function RecapPage() {
                 margin={{ top: 40, right: 250, bottom: 40, left: 150 }}
                 nodePadding={30}
                 nodeWidth={15}
-                link={(props: any) => {
-                  const { sourceX, sourceY, targetX, targetY, width, payload } = props;
-                  if (!width || width < 0.1) return <path d="" />;
-                  
-                  const sx = sourceX + 15; // Sortie du nœud source (nodeWidth = 15)
-                  const tx = targetX;      // Entrée du nœud cible
-                  
-                  return (
-                    <path
-                      d={`M${sx},${sourceY}C${(sx + tx) / 2},${sourceY} ${(sx + tx) / 2},${targetY} ${tx},${targetY}`}
-                      fill="none"
-                      stroke={payload?.color || "#cbd5e1"}
-                      strokeWidth={width}
-                      strokeOpacity="0.4"
-                    />
-                  );
-                }}
               >
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
