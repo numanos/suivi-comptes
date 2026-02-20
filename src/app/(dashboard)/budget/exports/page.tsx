@@ -197,8 +197,8 @@ export default function ExportsPage() {
       <div className="page-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
           <div>
-            <h1 className="page-title">Exports & Rapports</h1>
-            <p className="page-subtitle">Analysez vos finances et générez vos bilans</p>
+            <h1 className="page-title">Analyses & Rapports</h1>
+            <p className="page-subtitle">Visualisez vos postes de dépenses et générez vos bilans</p>
           </div>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <select 
