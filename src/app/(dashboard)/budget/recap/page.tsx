@@ -42,25 +42,25 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
         height={height}
         fill={payload.color || "#2563eb"}
         fillOpacity="1"
-        rx={3}
+        rx={2}
       />
       <text
-        x={isOut ? x - 15 : x + width + 15}
+        x={isOut ? x - 12 : x + width + 12}
         y={y + height / 2 - 8}
         textAnchor={isOut ? 'end' : 'start'}
         dominantBaseline="middle"
-        fontSize="13"
-        fill="#1f2937"
-        fontWeight="700"
+        fontSize="12"
+        fill="#111827"
+        fontWeight="bold"
       >
         {payload.name}
       </text>
       <text
-        x={isOut ? x - 15 : x + width + 15}
+        x={isOut ? x - 12 : x + width + 12}
         y={y + height / 2 + 10}
         textAnchor={isOut ? 'end' : 'start'}
         dominantBaseline="middle"
-        fontSize="12"
+        fontSize="11"
         fill={payload.color || "#2563eb"}
         fontWeight="600"
       >
@@ -70,31 +70,8 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
   );
 };
 
-const SankeyLink = (props: any) => {
-  const { sourceX, sourceY, targetX, targetY, sy, ty, width, payload } = props;
-  const color = payload.source.color || "#cbd5e1";
-
-  return (
-    <path
-      d={`
-        M${sourceX + 10},${sy}
-        C${(sourceX + targetX) / 2},${sy} 
-         ${(sourceX + targetX) / 2},${ty} 
-         ${targetX},${ty}
-        L${targetX},${ty + width}
-        C${(sourceX + targetX) / 2},${ty + width} 
-         ${(sourceX + targetX) / 2},${sy + width} 
-         ${sourceX + 10},${sy + width}
-        Z
-      `}
-      fill={color}
-      fillOpacity="0.25"
-      stroke="none"
-    />
-  );
-};
-
 export default function RecapPage() {
+
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [distributionData, setDistributionData] = useState<DistributionData | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -338,10 +315,10 @@ export default function RecapPage() {
               <Sankey
                 data={sankeyData}
                 node={<SankeyNode containerWidth={1000} />}
-                link={<SankeyLink />}
                 margin={{ top: 40, right: 250, bottom: 40, left: 150 }}
-                nodePadding={80}
-                nodeWidth={12}
+                nodePadding={60}
+                nodeWidth={15}
+                link={{ stroke: '#cbd5e1', strokeWidth: 0, fillOpacity: 0.2 }}
               >
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
