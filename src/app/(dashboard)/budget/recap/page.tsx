@@ -1,7 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Sankey, LabelList } from 'recharts';
+import { 
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, Legend, Sankey, LabelList
+} from 'recharts';
 
 interface AnnualData {
   year: number;
@@ -71,29 +74,19 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
 };
 
 const SankeyLink = (props: any) => {
-  const { sourceX, sourceY, targetX, targetY, sy, ty, width, payload } = props;
+  const { sourceX, sourceY, targetX, targetY, width, payload } = props;
   if (!width || width < 0.1) return null;
 
-  const nodeWidth = 15;
-  const startX = sourceX + nodeWidth;
-  const endX = targetX;
+  const sx = sourceX + 15;
+  const tx = targetX;
   
-  const curvature = 0.5;
-  const cp1x = startX + (endX - startX) * curvature;
-  const cp2x = startX + (endX - startX) * (1 - curvature);
-
   return (
     <path
-      d={`
-        M${startX},${sy}
-        C${cp1x},${sy} ${cp2x},${ty} ${endX},${ty}
-        L${endX},${ty + width}
-        C${cp2x},${ty + width} ${cp1x},${sy + width} ${startX},${sy + width}
-        Z
-      `}
-      fill={payload.color || "#cbd5e1"}
-      fillOpacity="0.2"
-      stroke="none"
+      d={`M${sx},${sourceY}C${(sx + tx) / 2},${sourceY} ${(sx + tx) / 2},${targetY} ${tx},${targetY}`}
+      fill="none"
+      stroke={payload.color || "#cbd5e1"}
+      strokeWidth={width}
+      strokeOpacity="0.2"
     />
   );
 };
@@ -173,6 +166,10 @@ export default function RecapPage() {
 
   const sankeyData = distributionData?.sankey || { nodes: [], links: [] };
 
+  if (loading && availableYears.length === 0) {
+    return <div className="p-8">Chargement...</div>;
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -241,13 +238,7 @@ export default function RecapPage() {
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Solde" stroke="#2563eb" strokeWidth={3} dot={false} connectNulls={false}>
-                  <LabelList 
-                    dataKey="Solde" 
-                    position="top" 
-                    offset={12} 
-                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
-                    style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} 
-                  />
+                  <LabelList dataKey="Solde" position="top" offset={12} formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -266,13 +257,7 @@ export default function RecapPage() {
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Revenus" stroke="#10b981" strokeWidth={3} dot={false} connectNulls={false}>
-                  <LabelList 
-                    dataKey="Revenus" 
-                    position="top" 
-                    offset={12} 
-                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
-                    style={{ fontSize: '10px', fontWeight: '600', fill: '#065f46' }} 
-                  />
+                  <LabelList dataKey="Revenus" position="top" offset={12} formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} style={{ fontSize: '10px', fontWeight: '600', fill: '#065f46' }} />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -293,13 +278,7 @@ export default function RecapPage() {
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Dépenses" stroke="#ef4444" strokeWidth={3} dot={false} connectNulls={false}>
-                  <LabelList 
-                    dataKey="Dépenses" 
-                    position="top" 
-                    offset={12} 
-                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
-                    style={{ fontSize: '10px', fontWeight: '600', fill: '#991b1b' }} 
-                  />
+                  <LabelList dataKey="Dépenses" position="top" offset={12} formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} style={{ fontSize: '10px', fontWeight: '600', fill: '#991b1b' }} />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
@@ -318,13 +297,7 @@ export default function RecapPage() {
                 <YAxis axisLine={false} tickLine={false} hide />
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
                 <Line type="monotone" dataKey="Épargne" stroke="#3b82f6" strokeWidth={3} dot={false} connectNulls={false}>
-                  <LabelList 
-                    dataKey="Épargne" 
-                    position="top" 
-                    offset={12} 
-                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
-                    style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} 
-                  />
+                  <LabelList dataKey="Épargne" position="top" offset={12} formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} />
                 </Line>
               </LineChart>
             </ResponsiveContainer>
