@@ -31,7 +31,10 @@ const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août',
 const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any) => {
   const isOut = x > containerWidth / 2;
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+      .format(amount)
+      .replace(/\u00a0/g, ' ')
+      .replace(/\u202f/g, ' ');
   };
 
   if (height < 2) return null;
@@ -86,7 +89,10 @@ export default function RecapPage() {
 
   const formatAmount = (amount: number | null | undefined) => {
     if (amount === null || amount === undefined || isNaN(amount)) return '0,00 €';
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
+      .format(amount)
+      .replace(/\u00a0/g, ' ')
+      .replace(/\u202f/g, ' ');
   };
 
   useEffect(() => {

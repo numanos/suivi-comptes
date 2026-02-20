@@ -251,7 +251,10 @@ export default function EnveloppesPage() {
   };
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
+      .format(amount)
+      .replace(/\u00a0/g, ' ')
+      .replace(/\u202f/g, ' ');
   };
 
   const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#64748b'];

@@ -37,7 +37,10 @@ export default function ExportsPage() {
 
   const formatAmount = (amount: number | null | undefined) => {
     if (amount === null || amount === undefined || isNaN(amount)) return '0,00 €';
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
+      .format(amount)
+      .replace(/\u00a0/g, ' ')
+      .replace(/\u202f/g, ' ');
   };
 
   useEffect(() => {
