@@ -310,15 +310,11 @@ export default function RecapPage() {
                   
                   return (
                     <path
-                      d={`
-                        M${sx},${sourceY - width / 2}
-                        C${(sx + tx) / 2},${sourceY - width / 2} ${(sx + tx) / 2},${targetY - width / 2} ${tx},${targetY - width / 2}
-                        L${tx},${targetY + width / 2}
-                        C${(sx + tx) / 2},${targetY + width / 2} ${(sx + tx) / 2},${sourceY + width / 2} ${sx},${sourceY + width / 2}
-                        Z
-                      `}
-                      fill={payload?.color || "#cbd5e1"}
-                      fillOpacity="0.3"
+                      d={`M${sx},${sourceY}C${(sx + tx) / 2},${sourceY} ${(sx + tx) / 2},${targetY} ${tx},${targetY}`}
+                      fill="none"
+                      stroke={payload?.color || "#cbd5e1"}
+                      strokeWidth={width}
+                      strokeOpacity="0.4"
                     />
                   );
                 }}
