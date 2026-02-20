@@ -73,25 +73,8 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
   );
 };
 
-const SankeyLink = (props: any) => {
-  const { sourceX, sourceY, targetX, targetY, width, payload } = props;
-  if (!width || width < 0.1) return null;
-
-  const sx = sourceX + 15;
-  const tx = targetX;
-  
-  return (
-    <path
-      d={`M${sx},${sourceY}C${(sx + tx) / 2},${sourceY} ${(sx + tx) / 2},${targetY} ${tx},${targetY}`}
-      fill="none"
-      stroke={payload.color || "#cbd5e1"}
-      strokeWidth={width}
-      strokeOpacity="0.2"
-    />
-  );
-};
-
 export default function RecapPage() {
+
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [distributionData, setDistributionData] = useState<DistributionData | null>(null);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -315,10 +298,23 @@ export default function RecapPage() {
               <Sankey
                 data={sankeyData}
                 node={<SankeyNode containerWidth={1000} />}
-                link={<SankeyLink />}
                 margin={{ top: 40, right: 250, bottom: 40, left: 150 }}
                 nodePadding={60}
                 nodeWidth={15}
+                link={(props: any) => {
+                  const { sourceX, sourceY, targetX, targetY, link, payload } = props;
+                  if (!link.width || link.width < 0.1) return <path />;
+                  const sx = sourceX + 15;
+                  return (
+                    <path
+                      d={`M${sx},${sourceY}C${(sx + targetX) / 2},${sourceY} ${(sx + targetX) / 2},${targetY} ${targetX},${targetY}`}
+                      fill="none"
+                      stroke={payload.color || "#cbd5e1"}
+                      strokeWidth={link.width}
+                      strokeOpacity="0.2"
+                    />
+                  );
+                }}
               >
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
