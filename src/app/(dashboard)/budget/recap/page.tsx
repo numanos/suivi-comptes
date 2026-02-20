@@ -70,31 +70,30 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
   );
 };
 
-// Composant de lien personnalisé pour garantir l'épaisseur et la couleur
 const SankeyLink = (props: any) => {
   const { sourceX, sourceY, targetX, targetY, sy, ty, width, payload } = props;
   if (!width || width < 0.1) return null;
 
   const nodeWidth = 15;
-  const sourceExitX = sourceX + nodeWidth;
+  const startX = sourceX + nodeWidth;
+  const endX = targetX;
   
+  const curvature = 0.5;
+  const cp1x = startX + (endX - startX) * curvature;
+  const cp2x = startX + (endX - startX) * (1 - curvature);
+
   return (
     <path
       d={`
-        M${sourceExitX},${sy}
-        C${(sourceExitX + targetX) / 2},${sy} 
-         ${(sourceExitX + targetX) / 2},${ty} 
-         ${targetX},${ty}
-        L${targetX},${ty + width}
-        C${(sourceExitX + targetX) / 2},${ty + width} 
-         ${(sourceExitX + targetX) / 2},${sy + width} 
-         ${sourceExitX},${sy + width}
+        M${startX},${sy}
+        C${cp1x},${sy} ${cp2x},${ty} ${endX},${ty}
+        L${endX},${ty + width}
+        C${cp2x},${ty + width} ${cp1x},${sy + width} ${startX},${sy + width}
         Z
       `}
-      fill={payload.color || payload.source.color || "#cbd5e1"}
-      fillOpacity="0.3"
-      stroke={payload.color || payload.source.color || "#cbd5e1"}
-      strokeOpacity="0.1"
+      fill={payload.color || "#cbd5e1"}
+      fillOpacity="0.2"
+      stroke="none"
     />
   );
 };
@@ -343,10 +342,10 @@ export default function RecapPage() {
               <Sankey
                 data={sankeyData}
                 node={<SankeyNode containerWidth={1000} />}
+                link={<SankeyLink />}
                 margin={{ top: 40, right: 250, bottom: 40, left: 150 }}
                 nodePadding={60}
                 nodeWidth={15}
-                link={{ stroke: '#cbd5e1', strokeOpacity: 0.2, fillOpacity: 0.3 }}
               >
                 <Tooltip formatter={(v: number) => formatAmount(v)} />
               </Sankey>
