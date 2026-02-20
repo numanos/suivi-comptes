@@ -38,23 +38,25 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
         y={y}
         width={width}
         height={height}
-        fill="#2563eb"
+        fill={payload.color || "#2563eb"}
         fillOpacity="0.8"
+        rx={2}
       />
       <text
-        x={isOut ? x - 8 : x + width + 8}
+        x={isOut ? x - 12 : x + width + 12}
         y={y + height / 2}
         textAnchor={isOut ? 'end' : 'start'}
         dominantBaseline="middle"
-        fontSize="12"
+        fontSize="13"
         fill="#333"
-        fontWeight="600"
+        fontWeight="700"
       >
         {payload.name}
       </text>
     </g>
   );
 };
+
 
 export default function RecapPage() {
   const [data, setData] = useState<AnnualData[]>([]);
@@ -135,20 +137,7 @@ export default function RecapPage() {
     };
   });
 
-  const pieData = distributionData?.categories?.filter(c => c.value > 0).slice(0, 10) || [];
-  
-  // Clean Sankey data: remove very small links to avoid clutter
-  const rawSankey = distributionData?.sankey || { nodes: [], links: [] };
-  const filteredLinks = rawSankey.links.filter(l => l.value > 5); // Filter links < 5€
-  const activeNodeIndices = new Set(filteredLinks.flatMap(l => [l.source, l.target]));
-  const sankeyData = {
-    nodes: rawSankey.nodes.filter((_, idx) => activeNodeIndices.has(idx)),
-    links: filteredLinks.map(l => ({
-      ...l,
-      source: Array.from(activeNodeIndices).indexOf(l.source),
-      target: Array.from(activeNodeIndices).indexOf(l.target)
-    }))
-  };
+  const sankeyData = distributionData?.sankey || { nodes: [], links: [] };
 
   return (
     <div>
@@ -158,6 +147,207 @@ export default function RecapPage() {
             <h1 className="page-title">Récap annuel</h1>
             <p className="page-subtitle">Analyse complète de l'année {selectedYear}</p>
           </div>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Choisir l'année :</span>
+            <select 
+              className="form-select" 
+              value={selectedYear} 
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              style={{ width: 'auto', minWidth: '120px' }}
+            >
+              {availableYears.length > 0 ? (
+                availableYears.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))
+              ) : (
+                <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+              )}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Solde fin de période</div>
+          <div className={`stat-value ${lastBalance >= 0 ? 'positive' : 'negative'}`}>
+            {formatAmount(lastBalance)}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Revenus (période)</div>
+          <div className="stat-value positive">
+            {formatAmount(ytdIncome)}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Épargne (période)</div>
+          <div className="stat-value">
+            {formatAmount(ytdSavings)}
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Dépenses (période)</div>
+          <div className="stat-value negative">
+            {formatAmount(ytdExpenses)}
+          </div>
+        </div>
+      </div>
+
+      {/* Line Charts Row 1: Balance & Income */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Soldes fin de mois</h2>
+          </div>
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 25, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <YAxis axisLine={false} tickLine={false} hide />
+                <Tooltip formatter={(v: number) => formatAmount(v)} />
+                <Line type="monotone" dataKey="Solde" stroke="#2563eb" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Solde" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} 
+                  />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Courbe des revenus</h2>
+          </div>
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 25, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <YAxis axisLine={false} tickLine={false} hide />
+                <Tooltip formatter={(v: number) => formatAmount(v)} />
+                <Line type="monotone" dataKey="Revenus" stroke="#10b981" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Revenus" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#065f46' }} 
+                  />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Line Charts Row 2: Expenses & Savings */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Courbe des dépenses</h2>
+          </div>
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 25, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <YAxis axisLine={false} tickLine={false} hide />
+                <Tooltip formatter={(v: number) => formatAmount(v)} />
+                <Line type="monotone" dataKey="Dépenses" stroke="#ef4444" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Dépenses" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#991b1b' }} 
+                  />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Courbe de l'épargne</h2>
+          </div>
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 25, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <YAxis axisLine={false} tickLine={false} hide />
+                <Tooltip formatter={(v: number) => formatAmount(v)} />
+                <Line type="monotone" dataKey="Épargne" stroke="#3b82f6" strokeWidth={3} dot={false} connectNulls={false}>
+                  <LabelList 
+                    dataKey="Épargne" 
+                    position="top" 
+                    offset={12} 
+                    formatter={(v: number) => v !== null ? `${Math.round(v)}€` : ''} 
+                    style={{ fontSize: '10px', fontWeight: '600', fill: '#1e40af' }} 
+                  />
+                </Line>
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Sankey Diagram for Categories & Subcategories */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Répartition des flux (Barres)</h2>
+          </div>
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+                <YAxis axisLine={false} tickLine={false} />
+                <Tooltip formatter={(v: number) => formatAmount(v)} />
+                <Legend />
+                <Bar dataKey="Revenus" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Épargne" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Diagramme des flux (Sankey)</h2>
+          </div>
+          <div className="chart-container" style={{ height: 350, padding: '1rem' }}>
+            {sankeyData.links.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <Sankey
+                  data={sankeyData}
+                  node={<SankeyNode containerWidth={500} />}
+                  link={{ stroke: '#cbd5e1', strokeWidth: 2, fillOpacity: 0.1 }}
+                  margin={{ top: 40, right: 140, bottom: 40, left: 100 }}
+                  nodePadding={40}
+                >
+                  <Tooltip formatter={(v: number) => formatAmount(v)} />
+                </Sankey>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-light)' }}>
+                Données insuffisantes pour générer le diagramme
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <span style={{ fontSize: '0.9rem', color: 'var(--text-light)' }}>Choisir l'année :</span>
             <select 

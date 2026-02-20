@@ -129,68 +129,47 @@ export async function GET(request: NextRequest) {
       const targetYear = year || new Date().getFullYear();
       
       // 1. Theme and category data for charts
-      const expenseThemes = await query(`
-        SELECT id FROM themes 
-        WHERE name LIKE '%Dépense%' OR name LIKE '%Depense%'
-      `) as any[];
-      
-      const themeIds = expenseThemes.map(t => t.id);
-      
-      if (themeIds.length === 0) {
-        return NextResponse.json({ categories: [], sankey: { nodes: [], links: [] } });
-      }
-
-      const themePlaceholders = themeIds.map(() => '?').join(',');
-
-      // Get category totals for Pie Chart
-      const catRows = await query(`
-        SELECT 
-          c.name as name,
-          SUM(ABS(t.amount)) as value
-        FROM transactions t
-        JOIN categories c ON t.category_id = c.id
-        WHERE YEAR(t.date) = ? AND t.amount < 0 AND c.theme_id IN (${themePlaceholders})
-        GROUP BY c.id
-        ORDER BY value DESC
-      `, [targetYear, ...themeIds]) as any[];
-
-      // 2. Global Flux Sankey (Income -> [Total] -> Expenses/Savings)
-      const globalFlux = await query(`
+      const fluxData = await query(`
         SELECT 
           SUM(CASE WHEN th.name = 'Revenus' AND t.amount > 0 THEN t.amount ELSE 0 END) as income,
-          SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as expenses,
+          SUM(CASE WHEN th.name = 'Dépenses fixes' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as fixed_expenses,
+          SUM(CASE WHEN th.name = 'Dépenses variables' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as var_expenses,
           SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as savings
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id
         LEFT JOIN themes th ON c.theme_id = th.id
         WHERE YEAR(t.date) = ?
       `, [targetYear]) as any[];
-
-      const flux = globalFlux[0];
-      const incomeVal = Number(flux.income) || 0;
-      const expenseVal = Number(flux.expenses) || 0;
-      const savingsVal = Number(flux.savings) || 0;
+      
+      const f = fluxData[0];
+      const income = Number(f.income) || 0;
+      const fixed = Number(f.fixed_expenses) || 0;
+      const variable = Number(f.var_expenses) || 0;
+      const savings = Number(f.savings) || 0;
+      const totalExpenses = fixed + variable;
+      const remaining = Math.max(0, income - totalExpenses - savings);
 
       const sankeyNodes = [
-        { name: 'Revenus' },
-        { name: 'Total Flux' },
-        { name: 'Dépenses' },
-        { name: 'Épargne' }
+        { name: 'Revenus', color: '#10b981' },           // 0
+        { name: 'Dépenses', color: '#f59e0b' },          // 1
+        { name: 'Épargne', color: '#3b82f6' },           // 2
+        { name: 'Solde restant', color: '#6366f1' },     // 3
+        { name: 'Dépenses fixes', color: '#f97316' },    // 4
+        { name: 'Dépenses variables', color: '#ef4444' } // 5
       ];
 
       const sankeyLinks = [];
-      if (incomeVal > 0) {
-        sankeyLinks.push({ source: 0, target: 1, value: incomeVal });
-      }
-      if (expenseVal > 0) {
-        sankeyLinks.push({ source: 1, target: 2, value: expenseVal });
-      }
-      if (savingsVal > 0) {
-        sankeyLinks.push({ source: 1, target: 3, value: savingsVal });
-      }
+      
+      // Level 1: Income to destinations
+      if (totalExpenses > 0) sankeyLinks.push({ source: 0, target: 1, value: totalExpenses });
+      if (savings > 0) sankeyLinks.push({ source: 0, target: 2, value: savings });
+      if (remaining > 0) sankeyLinks.push({ source: 0, target: 3, value: remaining });
+
+      // Level 2: Dépenses to sub-themes
+      if (fixed > 0) sankeyLinks.push({ source: 1, target: 4, value: fixed });
+      if (variable > 0) sankeyLinks.push({ source: 1, target: 5, value: variable });
 
       return NextResponse.json({
-        categories: catRows,
         sankey: { nodes: sankeyNodes, links: sankeyLinks }
       });
     }
