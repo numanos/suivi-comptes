@@ -153,61 +153,51 @@ export async function GET(request: NextRequest) {
         ORDER BY value DESC
       `, [targetYear]) as any[];
 
-      // 3. Get Top 10 categories for the Pie chart
-      const catRows = await query(`
-        SELECT 
-          c.name as name,
-          SUM(ABS(t.amount)) as value
-        FROM transactions t
-        JOIN categories c ON t.category_id = c.id
-        JOIN themes th ON c.theme_id = th.id
-        WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name IN ('Dépenses fixes', 'Dépenses variables')
-        GROUP BY c.id
-        ORDER BY value DESC
-        LIMIT 10
-      `, [targetYear]) as any[];
-
       const f = fluxData[0];
       const income = Number(f.income) || 0;
       const fixed = Number(f.fixed_expenses) || 0;
       const variable = Number(f.var_expenses) || 0;
       const savings = Number(f.savings) || 0;
-      const totalExpenses = fixed + variable;
-      const remaining = Math.max(0, income - totalExpenses - savings);
+      
+      // Calculate remaining balance (Income - Expenses - Savings)
+      const totalOut = (fixed + variable + savings);
+      const remaining = Math.max(0, income - totalOut);
 
-      // Define Nodes
+      // Define Nodes with specific IDs/Indices to be safe
+      // Level 0: Source
       const nodes = [
         { name: 'Revenus', color: '#3b82f6', amount: income },           // 0
-        { name: 'Dépenses', color: '#f97316', amount: totalExpenses },   // 1
+        // Level 1: Mid
+        { name: 'Dépenses', color: '#f97316', amount: fixed + variable }, // 1
         { name: 'Épargne', color: '#10b981', amount: savings },          // 2
         { name: 'Solde restant', color: '#6366f1', amount: remaining },  // 3
+        // Level 2: Dest
         { name: 'Dépenses fixes', color: '#ea580c', amount: fixed },     // 4
         { name: 'Dépenses variables', color: '#f59e0b', amount: variable } // 5
       ];
 
       const links = [];
       
-      // Level 1: Revenus -> Mid Nodes
-      if (totalExpenses > 0) links.push({ source: 0, target: 1, value: totalExpenses });
+      // Level 1: Revenus -> (Dépenses, Épargne, Solde)
+      if (fixed + variable > 0) links.push({ source: 0, target: 1, value: fixed + variable });
       if (savings > 0) links.push({ source: 0, target: 2, value: savings });
       if (remaining > 0) links.push({ source: 0, target: 3, value: remaining });
 
-      // Level 2: Dépenses -> Breakdown
+      // Level 2: Dépenses -> (Fixes, Variables)
       if (fixed > 0) links.push({ source: 1, target: 4, value: fixed });
       if (variable > 0) links.push({ source: 1, target: 5, value: variable });
 
-      // Level 2: Épargne -> Category breakdown
+      // Level 2: Épargne -> categories
       savingsCategories.forEach((cat: any) => {
+        const nodeName = cat.name === 'Epargne' ? 'Epargne Divers' : cat.name;
         const nodeIdx = nodes.length;
-        nodes.push({ name: cat.name, color: '#059669', amount: Number(cat.value) });
+        nodes.push({ name: nodeName, color: '#059669', amount: Number(cat.value) });
         links.push({ source: 2, target: nodeIdx, value: Number(cat.value) });
       });
 
-      return NextResponse.json({ 
-        categories: catRows,
-        sankey: { nodes, links } 
-      });
+      return NextResponse.json({ sankey: { nodes, links } });
     }
+
 
     return NextResponse.json({ error: 'Type requis' }, { status: 400 });
   } catch (error) {
