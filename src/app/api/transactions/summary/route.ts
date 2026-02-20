@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
     if (type === 'distribution') {
       const targetYear = year || new Date().getFullYear();
       
-      // 1. Theme and category data for charts
+      // 1. Get totals by theme
       const fluxData = await query(`
         SELECT 
           SUM(CASE WHEN th.name = 'Revenus' AND t.amount > 0 THEN t.amount ELSE 0 END) as income,
@@ -141,6 +141,32 @@ export async function GET(request: NextRequest) {
         WHERE YEAR(t.date) = ?
       `, [targetYear]) as any[];
       
+      // 2. Get breakdown of Savings categories
+      const savingsCategories = await query(`
+        SELECT c.name, SUM(ABS(t.amount)) as value
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        JOIN themes th ON c.theme_id = th.id
+        WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name = 'Epargne'
+        GROUP BY c.id
+        HAVING value > 0
+        ORDER BY value DESC
+      `, [targetYear]) as any[];
+
+      // 3. Get Top 10 categories for the Pie chart
+      const catRows = await query(`
+        SELECT 
+          c.name as name,
+          SUM(ABS(t.amount)) as value
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        JOIN themes th ON c.theme_id = th.id
+        WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name IN ('Dépenses fixes', 'Dépenses variables')
+        GROUP BY c.id
+        ORDER BY value DESC
+        LIMIT 10
+      `, [targetYear]) as any[];
+
       const f = fluxData[0];
       const income = Number(f.income) || 0;
       const fixed = Number(f.fixed_expenses) || 0;
@@ -149,28 +175,37 @@ export async function GET(request: NextRequest) {
       const totalExpenses = fixed + variable;
       const remaining = Math.max(0, income - totalExpenses - savings);
 
-      const sankeyNodes = [
-        { name: 'Revenus', color: '#10b981' },           // 0
-        { name: 'Dépenses', color: '#f59e0b' },          // 1
-        { name: 'Épargne', color: '#3b82f6' },           // 2
-        { name: 'Solde restant', color: '#6366f1' },     // 3
-        { name: 'Dépenses fixes', color: '#f97316' },    // 4
-        { name: 'Dépenses variables', color: '#ef4444' } // 5
+      // Define Nodes
+      const nodes = [
+        { name: 'Revenus', color: '#3b82f6', amount: income },           // 0
+        { name: 'Dépenses', color: '#f97316', amount: totalExpenses },   // 1
+        { name: 'Épargne', color: '#10b981', amount: savings },          // 2
+        { name: 'Solde restant', color: '#6366f1', amount: remaining },  // 3
+        { name: 'Dépenses fixes', color: '#ea580c', amount: fixed },     // 4
+        { name: 'Dépenses variables', color: '#f59e0b', amount: variable } // 5
       ];
 
-      const sankeyLinks = [];
+      const links = [];
       
-      // Level 1: Income to destinations
-      if (totalExpenses > 0) sankeyLinks.push({ source: 0, target: 1, value: totalExpenses });
-      if (savings > 0) sankeyLinks.push({ source: 0, target: 2, value: savings });
-      if (remaining > 0) sankeyLinks.push({ source: 0, target: 3, value: remaining });
+      // Level 1: Revenus -> Mid Nodes
+      if (totalExpenses > 0) links.push({ source: 0, target: 1, value: totalExpenses });
+      if (savings > 0) links.push({ source: 0, target: 2, value: savings });
+      if (remaining > 0) links.push({ source: 0, target: 3, value: remaining });
 
-      // Level 2: Dépenses to sub-themes
-      if (fixed > 0) sankeyLinks.push({ source: 1, target: 4, value: fixed });
-      if (variable > 0) sankeyLinks.push({ source: 1, target: 5, value: variable });
+      // Level 2: Dépenses -> Breakdown
+      if (fixed > 0) links.push({ source: 1, target: 4, value: fixed });
+      if (variable > 0) links.push({ source: 1, target: 5, value: variable });
 
-      return NextResponse.json({
-        sankey: { nodes: sankeyNodes, links: sankeyLinks }
+      // Level 2: Épargne -> Category breakdown
+      savingsCategories.forEach((cat: any) => {
+        const nodeIdx = nodes.length;
+        nodes.push({ name: cat.name, color: '#059669', amount: Number(cat.value) });
+        links.push({ source: 2, target: nodeIdx, value: Number(cat.value) });
+      });
+
+      return NextResponse.json({ 
+        categories: catRows,
+        sankey: { nodes, links } 
       });
     }
 

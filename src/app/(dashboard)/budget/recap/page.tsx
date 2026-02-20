@@ -18,7 +18,7 @@ interface AnnualData {
 
 interface DistributionData {
   sankey: {
-    nodes: { name: string; color?: string }[];
+    nodes: { name: string; color?: string; amount: number }[];
     links: { source: number; target: number; value: number }[];
   };
 }
@@ -27,6 +27,10 @@ const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août',
 
 const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any) => {
   const isOut = x > containerWidth / 2;
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount);
+  };
+
   if (height < 2) return null;
   
   return (
@@ -37,12 +41,12 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
         width={width}
         height={height}
         fill={payload.color || "#2563eb"}
-        fillOpacity="0.8"
+        fillOpacity="0.9"
         rx={2}
       />
       <text
         x={isOut ? x - 12 : x + width + 12}
-        y={y + height / 2}
+        y={y + height / 2 - 8}
         textAnchor={isOut ? 'end' : 'start'}
         dominantBaseline="middle"
         fontSize="13"
@@ -50,6 +54,17 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
         fontWeight="700"
       >
         {payload.name}
+      </text>
+      <text
+        x={isOut ? x - 12 : x + width + 12}
+        y={y + height / 2 + 10}
+        textAnchor={isOut ? 'end' : 'start'}
+        dominantBaseline="middle"
+        fontSize="11"
+        fill={payload.color || "#2563eb"}
+        fontWeight="600"
+      >
+        {formatAmount(payload.amount)}
       </text>
     </g>
   );
@@ -289,50 +304,48 @@ export default function RecapPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Répartition des flux (Barres)</h2>
-          </div>
-          <div className="chart-container">
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
-                <YAxis axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Legend />
-                <Bar dataKey="Revenus" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Épargne" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-header">
+          <h2 className="card-title">Diagramme des flux détaillés (Sankey)</h2>
         </div>
+        <div className="chart-container" style={{ height: 600, padding: '2rem' }}>
+          {sankeyData.links.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <Sankey
+                data={sankeyData}
+                node={<SankeyNode containerWidth={1000} />}
+                link={{ stroke: '#cbd5e1', strokeWidth: 2, fillOpacity: 0.15 }}
+                margin={{ top: 40, right: 220, bottom: 40, left: 120 }}
+                nodePadding={50}
+              >
+                <Tooltip formatter={(v: number) => formatAmount(v)} />
+              </Sankey>
+            </ResponsiveContainer>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-light)' }}>
+              Données insuffisantes pour générer le diagramme
+            </div>
+          )}
+        </div>
+      </div>
 
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Diagramme des flux (Sankey)</h2>
-          </div>
-          <div className="chart-container" style={{ height: 350, padding: '1rem' }}>
-            {sankeyData.links.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <Sankey
-                  data={sankeyData}
-                  node={<SankeyNode containerWidth={500} />}
-                  link={{ stroke: '#cbd5e1', strokeWidth: 2, fillOpacity: 0.1 }}
-                  margin={{ top: 40, right: 140, bottom: 40, left: 100 }}
-                  nodePadding={40}
-                >
-                  <Tooltip formatter={(v: number) => formatAmount(v)} />
-                </Sankey>
-              </ResponsiveContainer>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-light)' }}>
-                Données insuffisantes pour générer le diagramme
-              </div>
-            )}
-          </div>
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-header">
+          <h2 className="card-title">Répartition des flux (Barres)</h2>
+        </div>
+        <div className="chart-container">
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
+              <YAxis axisLine={false} tickLine={false} />
+              <Tooltip formatter={(v: number) => formatAmount(v)} />
+              <Legend />
+              <Bar dataKey="Revenus" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Dépenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Épargne" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
