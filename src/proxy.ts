@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export default function proxy(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const authCookie = request.cookies.get('auth');
   
   const isAuthPage = request.nextUrl.pathname === '/';
@@ -21,6 +21,8 @@ export default function proxy(request: NextRequest) {
 
   return NextResponse.next();
 }
+
+export default proxy;
 
 export const config = {
   matcher: ['/', '/dashboard/:path*', '/budget/:path*', '/patrimoine/:path*']
