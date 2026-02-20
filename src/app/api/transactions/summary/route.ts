@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
     if (type === 'distribution') {
       const targetYear = year || new Date().getFullYear();
       
-      // First, find theme IDs for expenses to be more robust
+      // 1. Theme and category data for charts
       const expenseThemes = await query(`
         SELECT id FROM themes 
         WHERE name LIKE '%Dépense%' OR name LIKE '%Depense%'
@@ -154,41 +154,44 @@ export async function GET(request: NextRequest) {
         ORDER BY value DESC
       `, [targetYear, ...themeIds]) as any[];
 
-      // Get category -> subcategory links for Sankey
-      const sankeyRows = await query(`
+      // 2. Global Flux Sankey (Income -> [Total] -> Expenses/Savings)
+      const globalFlux = await query(`
         SELECT 
-          c.name as source,
-          COALESCE(s.name, 'Autres') as target,
-          SUM(ABS(t.amount)) as value
+          SUM(CASE WHEN th.name = 'Revenus' AND t.amount > 0 THEN t.amount ELSE 0 END) as income,
+          SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as expenses,
+          SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as savings
         FROM transactions t
-        JOIN categories c ON t.category_id = c.id
-        LEFT JOIN subcategories s ON t.subcategory_id = s.id
-        WHERE YEAR(t.date) = ? AND t.amount < 0 AND c.theme_id IN (${themePlaceholders})
-        GROUP BY c.id, s.id
-        HAVING value > 0
-        ORDER BY value DESC
-      `, [targetYear, ...themeIds]) as any[];
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN themes th ON c.theme_id = th.id
+        WHERE YEAR(t.date) = ?
+      `, [targetYear]) as any[];
 
-      // Format for Sankey (nodes and links)
-      const nodesMap = new Map();
-      const links: any[] = [];
-      
-      sankeyRows.forEach((row: any) => {
-        if (!nodesMap.has(row.source)) nodesMap.set(row.source, nodesMap.size);
-        if (!nodesMap.has(row.target)) nodesMap.set(row.target, nodesMap.size);
-        
-        links.push({
-          source: nodesMap.get(row.source),
-          target: nodesMap.get(row.target),
-          value: Number(row.value)
-        });
-      });
+      const flux = globalFlux[0];
+      const incomeVal = Number(flux.income) || 0;
+      const expenseVal = Number(flux.expenses) || 0;
+      const savingsVal = Number(flux.savings) || 0;
 
-      const nodes = Array.from(nodesMap.keys()).map(name => ({ name }));
+      const sankeyNodes = [
+        { name: 'Revenus' },
+        { name: 'Total Flux' },
+        { name: 'Dépenses' },
+        { name: 'Épargne' }
+      ];
+
+      const sankeyLinks = [];
+      if (incomeVal > 0) {
+        sankeyLinks.push({ source: 0, target: 1, value: incomeVal });
+      }
+      if (expenseVal > 0) {
+        sankeyLinks.push({ source: 1, target: 2, value: expenseVal });
+      }
+      if (savingsVal > 0) {
+        sankeyLinks.push({ source: 1, target: 3, value: savingsVal });
+      }
 
       return NextResponse.json({
         categories: catRows,
-        sankey: { nodes, links }
+        sankey: { nodes: sankeyNodes, links: sankeyLinks }
       });
     }
 

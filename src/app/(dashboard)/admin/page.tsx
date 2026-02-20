@@ -65,8 +65,6 @@ export default function AdminPage() {
   };
 
   const fetchEnvelopes = async () => {
-
-  const fetchEnvelopes = async () => {
     setLoadingEnvelopes(true);
     try {
       const res = await fetch('/api/patrimoine?type=envelopes');

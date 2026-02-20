@@ -29,8 +29,7 @@ const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#64748b', '#8b5cf6', '#ec4899'
 
 const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any) => {
   const isOut = x > containerWidth / 2;
-  // Don't show labels for very small nodes to avoid clutter
-  if (height < 10) return <rect x={x} y={y} width={width} height={height} fill="#2563eb" fillOpacity="0.8" />;
+  if (height < 2) return null;
   
   return (
     <g>
@@ -43,13 +42,13 @@ const SankeyNode = ({ x, y, width, height, index, payload, containerWidth }: any
         fillOpacity="0.8"
       />
       <text
-        x={isOut ? x - 6 : x + width + 6}
+        x={isOut ? x - 8 : x + width + 8}
         y={y + height / 2}
         textAnchor={isOut ? 'end' : 'start'}
         dominantBaseline="middle"
-        fontSize="11"
+        fontSize="12"
         fill="#333"
-        fontWeight="500"
+        fontWeight="600"
       >
         {payload.name}
       </text>
@@ -214,7 +213,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -239,7 +238,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -267,7 +266,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
@@ -292,7 +291,7 @@ export default function RecapPage() {
           </div>
           <div className="chart-container">
             <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 10, bottom: 10 }}>
+              <LineChart data={chartData} margin={{ top: 30, right: 30, left: 20, bottom: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} fontSize={11} />
                 <YAxis axisLine={false} tickLine={false} hide />
