@@ -12,10 +12,59 @@ export default function AdminPage() {
   const [message, setMessage] = useState('');
   const [envelopes, setEnvelopes] = useState<Envelope[]>([]);
   const [loadingEnvelopes, setLoadingEnvelopes] = useState(false);
+  
+  // Password change state
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [loadingPassword, setLoadingPassword] = useState(false);
 
   useEffect(() => {
     fetchEnvelopes();
   }, []);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Le nouveau mot de passe et sa confirmation ne correspondent pas');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('Le nouveau mot de passe doit faire au moins 6 caractères');
+      return;
+    }
+
+    setLoadingPassword(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword, newPassword })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setPasswordSuccess('Mot de passe modifié avec succès');
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPasswordError(data.error || 'Erreur lors du changement de mot de passe');
+      }
+    } catch (error) {
+      setPasswordError('Erreur de connexion');
+    } finally {
+      setLoadingPassword(false);
+    }
+  };
+
+  const fetchEnvelopes = async () => {
 
   const fetchEnvelopes = async () => {
     setLoadingEnvelopes(true);
@@ -200,6 +249,68 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h2 className="card-title">Changement de mot de passe</h2>
+        </div>
+        <p style={{ marginBottom: '1rem', color: 'var(--text-light)' }}>
+          Modifiez votre mot de passe administrateur.
+        </p>
+
+        {passwordError && (
+          <div style={{ background: '#fee2e2', border: '1px solid #ef4444', color: '#b91c1c', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem' }}>
+            {passwordError}
+          </div>
+        )}
+        {passwordSuccess && (
+          <div style={{ background: '#dcfce7', border: '1px solid #22c55e', color: '#166534', padding: '0.75rem', borderRadius: '4px', marginBottom: '1rem' }}>
+            {passwordSuccess}
+          </div>
+        )}
+
+        <form onSubmit={handleChangePassword}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group">
+              <label className="form-label">Ancien mot de passe</label>
+              <input
+                type="password"
+                className="form-input"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Nouveau mot de passe</label>
+              <input
+                type="password"
+                className="form-input"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Confirmer nouveau</label>
+              <input
+                type="password"
+                className="form-input"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={loadingPassword}
+          >
+            {loadingPassword ? 'Enregistrement...' : 'Modifier le mot de passe'}
+          </button>
+        </form>
       </div>
 
       <div className="card">

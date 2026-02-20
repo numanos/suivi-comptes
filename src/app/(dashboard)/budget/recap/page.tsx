@@ -34,6 +34,11 @@ export default function RecapPage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
+  const formatAmount = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined || isNaN(amount)) return '0,00 €';
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
+  };
+
   useEffect(() => {
     // Get available years
     fetch('/api/transactions?getYears=true')
