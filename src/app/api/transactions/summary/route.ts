@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
       }
 
       // 1. Distribution by Category (Expenses only)
-      const categories = await query(`
+      const categoriesRaw = await query(`
         SELECT 
           c.name, 
           ABS(SUM(t.amount)) as value,
@@ -220,8 +220,13 @@ export async function GET(request: NextRequest) {
         ORDER BY value DESC
       `, params) as any[];
 
+      const categories = categoriesRaw.map(c => ({
+        ...c,
+        value: Number(c.value) || 0
+      }));
+
       // 2. Top Subcategories (Expenses only)
-      const subcategories = await query(`
+      const subcategoriesRaw = await query(`
         SELECT 
           s.name, 
           c.name as category_name,
@@ -236,8 +241,13 @@ export async function GET(request: NextRequest) {
         LIMIT 15
       `, params) as any[];
 
+      const subcategories = subcategoriesRaw.map(s => ({
+        ...s,
+        value: Number(s.value) || 0
+      }));
+
       // 3. Thematic Totals
-      const themes = await query(`
+      const themesRaw = await query(`
         SELECT 
           SUM(CASE WHEN c.name = 'Alimentation' THEN ABS(t.amount) ELSE 0 END) as alimentation,
           SUM(CASE WHEN c.name = 'Enfants & Scolarité' THEN ABS(t.amount) ELSE 0 END) as scolarite,
@@ -252,10 +262,20 @@ export async function GET(request: NextRequest) {
         WHERE ${dateFilter}
       `, params) as any[];
 
+      const t = themesRaw[0] || {};
+      const thematic = {
+        alimentation: Number(t.alimentation) || 0,
+        scolarite: Number(t.scolarite) || 0,
+        sante: Number(t.sante) || 0,
+        assurances: Number(t.assurances) || 0,
+        epargne: Number(t.epargne) || 0,
+        revenus: Number(t.revenus) || 0
+      };
+
       return NextResponse.json({
         categories,
         subcategories,
-        thematic: themes[0] || {}
+        thematic
       });
     }
 

@@ -1,11 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { 
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend
-} from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 interface ReportData {
   categories: { name: string; value: number; theme: string }[];
@@ -71,8 +69,7 @@ export default function ExportsPage() {
   const generatePDF = () => {
     if (!reportData) return;
 
-    const doc = new jsPDF() as any;
-    const pageWidth = doc.internal.pageSize.getWidth();
+    const doc = new jsPDF();
     const period = selectedMonth === 'all' 
       ? `Année ${selectedYear}` 
       : `${monthNames[parseInt(selectedMonth) - 1]} ${selectedYear}`;
@@ -119,10 +116,10 @@ export default function ExportsPage() {
       c.name,
       c.theme,
       formatAmount(c.value),
-      `${((c.value / totalExpenses) * 100).toFixed(1)}%`
+      `${((c.value / (totalExpenses || 1)) * 100).toFixed(1)}%`
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 95,
       head: [['Catégorie', 'Thème', 'Montant', '%']],
       body: categoryRows,
@@ -142,7 +139,7 @@ export default function ExportsPage() {
       ['Assurances (Logement, Auto, etc.)', formatAmount(reportData.thematic.assurances)]
     ];
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: currentY + 5,
       body: thematicRows,
       theme: 'grid',
@@ -161,7 +158,7 @@ export default function ExportsPage() {
       formatAmount(s.value)
     ]);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: subY + 5,
       head: [['Sous-catégorie', 'Catégorie parente', 'Montant']],
       body: subRows,
@@ -252,25 +249,31 @@ export default function ExportsPage() {
             <h2 className="card-title">Répartition par catégorie</h2>
           </div>
           <div className="chart-container" style={{ height: '400px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={reportData?.categories}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={80}
-                  outerRadius={120}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {reportData?.categories.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v: number) => formatAmount(v)} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+            {reportData && reportData.categories.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={reportData.categories}
+                    cx="40%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {reportData.categories.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v: number) => formatAmount(v)} />
+                  <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ paddingLeft: '20px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-light)' }}>
+                Aucune donnée pour cette période
+              </div>
+            )}
           </div>
         </div>
 
