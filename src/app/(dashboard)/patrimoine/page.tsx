@@ -320,7 +320,7 @@ export default function PatrimoinePage() {
                   </span>
                 )}
                 <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-light)' }}>
-                  Versements: {formatAmount(summaryData.yearVersements - summaryData.prevYearVersements)}
+                  Versements: {formatAmount(summaryData.yearVersements)}
                 </div>
               </div>
             ) : (

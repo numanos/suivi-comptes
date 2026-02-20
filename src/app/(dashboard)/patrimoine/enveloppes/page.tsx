@@ -575,9 +575,16 @@ export default function EnveloppesPage() {
                 <div className="card-header">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <h2 className="card-title">{envelope.name}</h2>
-                    <span className="badge badge-secondary">
-                      {formatAmount(cumulativeVersements)} versés
-                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <span className="badge badge-secondary" style={{ fontSize: '0.75rem' }}>
+                        Total versé : {formatAmount(cumulativeVersements)}
+                      </span>
+                      {Number(envelope.year_versements) !== 0 && (
+                        <span className="badge badge-primary" style={{ fontSize: '0.75rem' }}>
+                          Versé en {year} : {formatAmount(Number(envelope.year_versements))}
+                        </span>
+                      )}
+                    </div>
                     {envelope.exclude_from_gains && <span className="badge badge-warning">Gain désactivé</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>

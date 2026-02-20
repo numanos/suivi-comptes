@@ -16,24 +16,12 @@ export async function GET(request: NextRequest) {
         SELECT 
           MONTH(t.date) as month,
           YEAR(t.date) as year,
-          (SELECT SUM(ABS(t2.amount)) FROM transactions t2 
-           WHERE YEAR(t2.date) = YEAR(t.date) 
-           AND MONTH(t2.date) = MONTH(t.date)
-           AND t2.amount < 0
-           AND t2.category_id IN (
-             SELECT id FROM categories WHERE theme_id IN (
-               SELECT id FROM themes WHERE name IN ('Dépenses fixes', 'Dépenses variables')
-             )
-           )) as total_expenses,
+          SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_expenses,
           SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
-          (SELECT SUM(ABS(t2.amount)) FROM transactions t2 
-           WHERE YEAR(t2.date) = YEAR(t.date) 
-           AND MONTH(t2.date) = MONTH(t.date)
-           AND t2.amount < 0
-           AND t2.category_id IN (
-             SELECT id FROM categories WHERE theme_id = (SELECT id FROM themes WHERE name = 'Epargne')
-           )) as total_savings
+          SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_savings
         FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN themes th ON c.theme_id = th.id
         WHERE YEAR(t.date) = ?
         GROUP BY YEAR(t.date), MONTH(t.date)
         ORDER BY year, month
@@ -88,22 +76,12 @@ export async function GET(request: NextRequest) {
       const rows = await query(`
         SELECT 
           YEAR(t.date) as year,
-          (SELECT SUM(ABS(t2.amount)) FROM transactions t2 
-           WHERE YEAR(t2.date) = YEAR(t.date)
-           AND t2.amount < 0
-           AND t2.category_id IN (
-             SELECT id FROM categories WHERE theme_id IN (
-               SELECT id FROM themes WHERE name IN ('Dépenses fixes', 'Dépenses variables')
-             )
-           )) as total_expenses,
+          SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_expenses,
           SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
-          (SELECT SUM(ABS(t2.amount)) FROM transactions t2 
-           WHERE YEAR(t2.date) = YEAR(t.date)
-           AND t2.amount < 0
-           AND t2.category_id IN (
-             SELECT id FROM categories WHERE theme_id = (SELECT id FROM themes WHERE name = 'Epargne')
-           )) as total_savings
+          SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_savings
         FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN themes th ON c.theme_id = th.id
         WHERE YEAR(t.date) <= ?
         GROUP BY YEAR(t.date)
         ORDER BY year DESC
@@ -113,24 +91,14 @@ export async function GET(request: NextRequest) {
       // Calculate YTD (Year to Date) for current year
       const ytdRows = await query(`
         SELECT 
-          (SELECT SUM(ABS(t2.amount)) FROM transactions t2 
-           WHERE YEAR(t2.date) = ? AND MONTH(t2.date) <= ?
-           AND t2.amount < 0
-           AND t2.category_id IN (
-             SELECT id FROM categories WHERE theme_id IN (
-               SELECT id FROM themes WHERE name IN ('Dépenses fixes', 'Dépenses variables')
-             )
-           )) as total_expenses,
+          SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_expenses,
           SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
-          (SELECT SUM(ABS(t2.amount)) FROM transactions t2 
-           WHERE YEAR(t2.date) = ? AND MONTH(t2.date) <= ?
-           AND t2.amount < 0
-           AND t2.category_id IN (
-             SELECT id FROM categories WHERE theme_id = (SELECT id FROM themes WHERE name = 'Epargne')
-           )) as total_savings
+          SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_savings
         FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN themes th ON c.theme_id = th.id
         WHERE YEAR(t.date) = ? AND MONTH(t.date) <= ?
-      `, [currentYear, currentMonth, currentYear, currentMonth, currentYear, currentMonth]) as any[];
+      `, [currentYear, currentMonth]) as any[];
 
       const summary = rows.map(row => ({
         year: row.year,
@@ -146,6 +114,23 @@ export async function GET(request: NextRequest) {
       }));
 
       return NextResponse.json(summary);
+    }
+
+    if (type === 'distribution') {
+      const targetYear = year || new Date().getFullYear();
+      const rows = await query(`
+        SELECT 
+          c.name as name,
+          th.name as theme,
+          SUM(ABS(t.amount)) as value
+        FROM transactions t
+        JOIN categories c ON t.category_id = c.id
+        JOIN themes th ON c.theme_id = th.id
+        WHERE YEAR(t.date) = ? AND t.amount < 0 AND th.name IN ('Dépenses fixes', 'Dépenses variables')
+        GROUP BY c.id, th.id
+        ORDER BY value DESC
+      `, [targetYear]) as any[];
+      return NextResponse.json(rows);
     }
 
     return NextResponse.json({ error: 'Type requis' }, { status: 400 });
