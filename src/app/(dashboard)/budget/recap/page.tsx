@@ -1,85 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
-
-interface AnnualData {
-  year: number;
-  total_expenses: number;
-  total_income: number;
-  total_savings: number;
-  isCurrentYear: boolean;
-  ytd?: {
-    total_expenses: number;
-    total_income: number;
-    total_savings: number;
-  };
-}
-
-interface DistributionData {
-  name: string;
-  theme: string;
-  value: number;
-}
-
-const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#64748b', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
-
-export default function RecapPage() {
-  const [data, setData] = useState<AnnualData[]>([]);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
-  const [distributionData, setDistributionData] = useState<DistributionData[]>([]);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-
-  const formatAmount = (amount: number | null | undefined) => {
-    if (amount === null || amount === undefined || isNaN(amount)) return '0,00 €';
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
-  };
-
-  useEffect(() => {
-    // Get available years
-    fetch('/api/transactions?getYears=true')
-      .then(res => res.json())
-      .then(data => {
-        if (data.years) setAvailableYears(data.years);
-      });
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetch('/api/transactions/summary?type=annual').then(res => res.json()),
-      fetch(`/api/transactions/summary?type=monthly&year=${selectedYear}`).then(res => res.json()),
-      fetch(`/api/transactions/summary?type=distribution&year=${selectedYear}`).then(res => res.json())
-    ]).then(([annual, monthly, distribution]) => {
-      setData(annual);
-      setMonthlyData(monthly);
-      setDistributionData(distribution);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [selectedYear]);
-
-  // Filters for period
-  const filteredMonthlyData = selectedMonth 
-    ? monthlyData.filter(d => d.month === selectedMonth)
-    : monthlyData;
-
-  const ytdExpenses = filteredMonthlyData.reduce((sum, d) => sum + (Number(d.total_expenses) || 0), 0);
-  const ytdIncome = filteredMonthlyData.reduce((sum, d) => sum + (Number(d.total_income) || 0), 0);
-  const ytdSavings = filteredMonthlyData.reduce((sum, d) => sum + (Number(d.total_savings) || 0), 0);
-  const lastBalance = filteredMonthlyData.length > 0 ? filteredMonthlyData[filteredMonthlyData.length - 1].balance : 0;
-
-  const chartData = (Array.isArray(monthlyData) ? monthlyData : []).map(d => ({
-    name: monthNames[d.month - 1],
-    Dépenses: Number(d.total_expenses) || 0,
-    Revenus: Number(d.total_income) || 0,
-    Épargne: Number(d.total_savings) || 0,
-    Solde: d.balance
-  }));
-
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell, Sankey } from 'recharts';
 
 interface AnnualData {
@@ -113,7 +34,6 @@ export default function RecapPage() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
 
   const formatAmount = (amount: number | null | undefined) => {
     if (amount === null || amount === undefined || isNaN(amount)) return '0,00 €';
@@ -143,15 +63,10 @@ export default function RecapPage() {
     }).catch(() => setLoading(false));
   }, [selectedYear]);
 
-  // Filters for period
-  const filteredMonthlyData = selectedMonth 
-    ? (Array.isArray(monthlyData) ? monthlyData.filter(d => d.month === selectedMonth) : [])
-    : (Array.isArray(monthlyData) ? monthlyData : []);
-
-  const ytdExpenses = filteredMonthlyData.reduce((sum, d) => sum + (Number(d.total_expenses) || 0), 0);
-  const ytdIncome = filteredMonthlyData.reduce((sum, d) => sum + (Number(d.total_income) || 0), 0);
-  const ytdSavings = filteredMonthlyData.reduce((sum, d) => sum + (Number(d.total_savings) || 0), 0);
-  const lastBalance = filteredMonthlyData.length > 0 ? filteredMonthlyData[filteredMonthlyData.length - 1].balance : 0;
+  const ytdExpenses = (Array.isArray(monthlyData) ? monthlyData : []).reduce((sum, d) => sum + (Number(d.total_expenses) || 0), 0);
+  const ytdIncome = (Array.isArray(monthlyData) ? monthlyData : []).reduce((sum, d) => sum + (Number(d.total_income) || 0), 0);
+  const ytdSavings = (Array.isArray(monthlyData) ? monthlyData : []).reduce((sum, d) => sum + (Number(d.total_savings) || 0), 0);
+  const lastBalance = monthlyData && monthlyData.length > 0 ? monthlyData[monthlyData.length - 1].balance : 0;
 
   const chartData = (Array.isArray(monthlyData) ? monthlyData : []).map(d => ({
     name: monthNames[d.month - 1],
@@ -163,6 +78,10 @@ export default function RecapPage() {
 
   const pieData = distributionData?.categories?.slice(0, 10) || [];
   const sankeyData = distributionData?.sankey || { nodes: [], links: [] };
+
+  if (loading && availableYears.length === 0) {
+    return <div className="p-8">Chargement...</div>;
+  }
 
   return (
     <div>
@@ -411,4 +330,3 @@ export default function RecapPage() {
     </div>
   );
 }
-
