@@ -303,15 +303,22 @@ export default function RecapPage() {
                 nodeWidth={15}
                 link={(props: any) => {
                   const { sourceX, sourceY, targetX, targetY, width, payload } = props;
-                  if (width < 1) return <path d="" />;
+                  if (!width || width < 0.1) return <path d="" />;
+                  
+                  const sx = sourceX + 15; // Sortie du nœud source (nodeWidth = 15)
+                  const tx = targetX;      // Entrée du nœud cible
                   
                   return (
                     <path
-                      d={`M${sourceX},${sourceY}C${(sourceX + targetX) / 2},${sourceY} ${(sourceX + targetX) / 2},${targetY} ${targetX},${targetY}`}
-                      fill="none"
-                      stroke={payload?.color || "#cbd5e1"}
-                      strokeWidth={width}
-                      strokeOpacity="0.5"
+                      d={`
+                        M${sx},${sourceY - width / 2}
+                        C${(sx + tx) / 2},${sourceY - width / 2} ${(sx + tx) / 2},${targetY - width / 2} ${tx},${targetY - width / 2}
+                        L${tx},${targetY + width / 2}
+                        C${(sx + tx) / 2},${targetY + width / 2} ${(sx + tx) / 2},${sourceY + width / 2} ${sx},${sourceY + width / 2}
+                        Z
+                      `}
+                      fill={payload?.color || "#cbd5e1"}
+                      fillOpacity="0.3"
                     />
                   );
                 }}
