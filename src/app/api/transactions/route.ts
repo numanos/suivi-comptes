@@ -265,9 +265,11 @@ export async function POST(request: NextRequest) {
     const montantIdx = headers.findIndex(h => h.includes('montant'));
     const categorieIdx = headers.findIndex(h => h.includes('categor') || h.includes('cat'));
     const sousCatIdx = headers.findIndex(h => h.includes('sous'));
-    const soldeIdx = headers.findIndex(h => h.includes('solde'));
+    const soldeIdx = headers.findIndex(h => h === 'solde' || h.includes('solde'));
     
-    console.log('Column indices:', { dateIdx, libelleIdx, noteIdx, montantIdx, categorieIdx, sousCatIdx, soldeIdx });
+    const hasBalanceColumn = soldeIdx >= 0;
+    
+    console.log('Column indices:', { dateIdx, libelleIdx, noteIdx, montantIdx, categorieIdx, sousCatIdx, soldeIdx, hasBalanceColumn });
     
     // Parse data lines
     const data: any[] = [];
@@ -299,6 +301,16 @@ export async function POST(request: NextRequest) {
       const amountClean = amountStr.replace(/\s/g, '').replace(',', '.');
       const amount = parseFloat(amountClean);
       
+      // Parse balance from CSV if column exists
+      let csvBalance: number | null = null;
+      if (hasBalanceColumn) {
+        const balanceStr = soldeIdx >= 0 && soldeIdx < row.length ? row[soldeIdx] : '0';
+        const balanceClean = balanceStr.replace(/\s/g, '').replace(',', '.');
+        if (balanceClean) {
+          csvBalance = parseFloat(balanceClean);
+        }
+      }
+      
       const dateParts = dateStr.split('/');
       let date = null;
       if (dateParts.length === 3) {
@@ -307,7 +319,10 @@ export async function POST(request: NextRequest) {
       
       if (!date) continue;
       
-      const key = `${date}|${libelle}|${amount}`;
+      // Include balance in duplicate key if column exists (allows distinguishing same date/label/amount with different balances)
+      const balancePart = hasBalanceColumn && csvBalance !== null ? `|${csvBalance}` : '';
+      const key = `${date}|${libelle}|${amount}${balancePart}`;
+      
       let isDuplicate = false;
       let duplicateType: 'file' | 'database' | null = null;
 
@@ -324,9 +339,9 @@ export async function POST(request: NextRequest) {
       }
 
       if (isDuplicate) {
-        duplicates.push({ date, libelle, amount, rowIndex: i + 2, type: duplicateType });
+        duplicates.push({ date, libelle, amount, balance: csvBalance, rowIndex: i + 2, type: duplicateType });
       } else {
-        parsedRows.push({ row, date, libelle, amount, index: i });
+        parsedRows.push({ row, date, libelle, amount, csvBalance, index: i });
       }
     }
 
@@ -352,8 +367,6 @@ export async function POST(request: NextRequest) {
         const rowIdx = idx - 2; // Convert back to 0-based data index
         if (rowIdx >= 0 && rowIdx < data.length) {
           const row = data[rowIdx];
-          // We need to find the date/libelle/amount for this row again or store it
-          // Let's just find it from the data again
           const dateStr = dateIdx >= 0 && dateIdx < row.length ? row[dateIdx] : '';
           const libelleRaw = libelleIdx >= 0 && libelleIdx < row.length ? row[libelleIdx] : '';
           const amountStr = montantIdx >= 0 && montantIdx < row.length ? row[montantIdx] : '0';
@@ -362,19 +375,29 @@ export async function POST(request: NextRequest) {
           const amountClean = amountStr.replace(/\s/g, '').replace(',', '.');
           const amount = parseFloat(amountClean);
           
+          // Also parse balance for selected duplicates
+          let csvBalance: number | null = null;
+          if (hasBalanceColumn) {
+            const balanceStr = soldeIdx >= 0 && soldeIdx < row.length ? row[soldeIdx] : '0';
+            const balanceClean = balanceStr.replace(/\s/g, '').replace(',', '.');
+            if (balanceClean) {
+              csvBalance = parseFloat(balanceClean);
+            }
+          }
+          
           const dateParts = dateStr.split('/');
           let date = null;
           if (dateParts.length === 3) {
             date = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
           }
           if (date) {
-            rowsToImport.push({ row, date, libelle, amount, index: rowIdx });
+            rowsToImport.push({ row, date, libelle, amount, csvBalance, index: rowIdx });
           }
         }
       }
     }
 
-    // Sort by index to maintain original order if possible (optional but nice)
+    // Sort by index to maintain original CSV order
     rowsToImport.sort((a, b) => a.index - b.index);
 
     console.log('rowsToImport.length:', rowsToImport.length);
@@ -521,6 +544,51 @@ export async function POST(request: NextRequest) {
     }
 
     await connection.query('UPDATE import_batches SET record_count = ? WHERE id = ?', [imported, batchId]);
+
+    // Recalculer les soldes du batch dans l'ordre du CSV pour garantir la cohérence
+    if (hasBalanceColumn && rowsToImport.length > 0) {
+      console.log('Recalculating balances for batch:', batchId);
+      
+      // Récupérer le dernier solde connu AVANT la première transaction du batch
+      const firstDate = rowsToImport[0].date;
+      const prevBalanceRows = await connection.query(`
+        SELECT balance FROM transactions 
+        WHERE date < ? AND balance IS NOT NULL 
+        ORDER BY date DESC, id DESC LIMIT 1
+      `, [firstDate]) as any[];
+      
+      let runningBalance = prevBalanceRows.length > 0 ? Number(prevBalanceRows[0].balance) : 0;
+      
+      // Récupérer toutes les transactions du batch dans l'ordre CSV (par index)
+      const batchTxns = await connection.query(`
+        SELECT id, amount, balance FROM transactions 
+        WHERE import_batch_id = ? 
+        ORDER BY id ASC
+      `, [batchId]) as any[];
+      
+      // Mapper par index pour retrouver l'ordre CSV
+      const txnByIndex = new Map<number, any>();
+      for (const txn of batchTxns) {
+        // On ne peut pas mapper directement par index, on utilise l'ordre d'insertion (id ASC)
+        // qui correspond à l'ordre du tri rowsToImport (par index)
+      }
+      
+      // Approche plus simple : mettre à jour en ordre d'ID (qui suit l'ordre d'insertion = ordre CSV)
+      let currentBalance = runningBalance;
+      for (let i = 0; i < batchTxns.length; i++) {
+        const txn = batchTxns[i];
+        // Le montant est déjà signé (positif = revenu, négatif = dépense)
+        currentBalance += Number(txn.amount);
+        
+        // Mettre à jour le solde en base
+        await connection.query(
+          'UPDATE transactions SET balance = ? WHERE id = ?',
+          [currentBalance, txn.id]
+        );
+      }
+      
+      console.log('Balances recalculated for batch:', batchId, 'final balance:', currentBalance);
+    }
 
     console.log('Import complete:', { imported, skipped, newCategories, newSubcategories });
 
