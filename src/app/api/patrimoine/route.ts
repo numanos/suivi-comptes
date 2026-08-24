@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year');
     const type = searchParams.get('type');
@@ -76,16 +79,13 @@ export async function GET(request: NextRequest) {
       let historicalTotals: any[] = [];
       try {
         historicalTotals = await query('SELECT * FROM historical_totals') as any[];
-        console.log('Historical totals from DB:', historicalTotals);
       } catch (error: any) {
         // Table doesn't exist, skip historical data
         if (error.code !== 'ER_NO_SUCH_TABLE') {
           throw error;
         }
-        console.log('historical_totals table does not exist');
       }
       const historicalMap = new Map(historicalTotals.map(h => [h.year, h.total]));
-      console.log('Historical map:', Array.from(historicalMap.entries()));
 
       const allYears = new Set([...years.map(y => y.year), ...historicalTotals.map(h => h.year)]);
       const sortedYears = Array.from(allYears).sort((a, b) => b - a);
@@ -161,7 +161,6 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      console.log('Evolution data to return:', evolution);
       return NextResponse.json(evolution);
     }
 
@@ -273,17 +272,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const body = await request.json();
     const { name, versements, year, exclude_from_gains, historical_year, historical_total, open_year } = body;
 
     if (historical_year !== undefined && historical_total !== undefined) {
-      console.log('Saving historical data:', { historical_year, historical_total });
       try {
         const result = await query(
           `INSERT INTO historical_totals (year, total) VALUES (?, ?) ON DUPLICATE KEY UPDATE total = ?`,
           [parseInt(historical_year), parseFloat(historical_total), parseFloat(historical_total)]
         );
-        console.log('Historical data saved:', result);
         return NextResponse.json({ success: true });
       } catch (error: any) {
         console.error('Error saving historical data:', error);
@@ -324,6 +323,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { id, name, exclude_from_gains, year, versements, close_envelope, annual_versement, open_year, initial_amount } = await request.json();
 
     if (!id) {
@@ -413,6 +414,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const envelopeId = searchParams.get('envelope_id');

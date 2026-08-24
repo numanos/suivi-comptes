@@ -39,7 +39,8 @@
 ## Identifiants par défaut
 
 - Email : `admin@local`
-- Mot de passe : `admin123`
+- Le premier mot de passe est défini par `ADMIN_INITIAL_PASSWORD` lors de l'initialisation.
+- Après connexion, modifier le mot de passe depuis la page Admin.
 
 ## Fonctionnalités
 
@@ -54,6 +55,8 @@
 - Suivi des placements par année
 - Tableau d'évolution annuel
 - Graphiques de répartition
+- Relevés d'enveloppe à date libre, conservés dans l'historique
+- Gain global calculé par enveloppe: valorisation totale moins versements nets cumulés
 
 ## Structure du projet
 

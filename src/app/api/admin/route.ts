@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireAdmin } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireAdmin();
+    if (user instanceof NextResponse) return user;
     const { action } = await request.json();
 
     if (action === 'purge_transactions') {
@@ -25,7 +28,11 @@ export async function POST(request: NextRequest) {
       await query('DELETE FROM transactions');
       await query('DELETE FROM import_batches');
       await query('DELETE FROM placements');
+      await query('DELETE FROM snapshot_placements');
+      await query('DELETE FROM envelope_snapshots');
+      await query('DELETE FROM envelope_versements');
       await query('DELETE FROM envelopes');
+      await query('DELETE FROM historical_totals');
       await query('DELETE FROM subcategories');
       await query('DELETE FROM categories');
       await query('ALTER TABLE transactions AUTO_INCREMENT = 1');
@@ -38,18 +45,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === 'reset_categories') {
-      // Delete custom categories (keep defaults)
+      // The schema has no categories.is_default column. Rebuild categories under existing themes.
       await query('DELETE FROM subcategories');
-      await query('DELETE FROM categories WHERE is_default = 0');
-      
-      // Re-insert defaults
-      await query(`
-        INSERT INTO themes (name, is_default, display_order) VALUES
-        ('Dépenses fixes', TRUE, 1),
-        ('Dépenses variables', TRUE, 2),
-        ('Revenus', TRUE, 3),
-        ('Epargne', TRUE, 4)
-      `);
+      await query('DELETE FROM categories');
       
       const themes = await query('SELECT id, name FROM themes') as any[];
       const themesMap: Record<string, number> = {};

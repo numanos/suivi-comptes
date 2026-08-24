@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { name, category_id } = await request.json();
 
     if (!name || !category_id) {
@@ -23,6 +26,8 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET() {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const rows = await query('SELECT * FROM themes ORDER BY display_order');
     return NextResponse.json(rows);
   } catch (error) {
@@ -13,6 +16,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { name, display_order } = await request.json();
 
     if (!name) {
@@ -33,6 +38,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { id, name, display_order } = await request.json();
 
     if (!id || !name) {
@@ -53,6 +60,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

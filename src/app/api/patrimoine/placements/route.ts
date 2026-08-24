@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const envelopeId = searchParams.get('envelope_id');
     const year = searchParams.get('year');
@@ -32,6 +35,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { envelope_id, name, type_placement, year, valorization } = await request.json();
 
     if (!envelope_id || !name || !type_placement || !year) {
@@ -55,6 +60,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { id, name, type_placement, year, valorization } = await request.json();
 
     if (!id || !name) {
@@ -78,6 +85,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

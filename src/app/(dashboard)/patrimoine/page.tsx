@@ -77,9 +77,6 @@ export default function PatrimoinePage() {
       const evolution = await evolutionRes.json();
       const summary = await summaryRes.json();
       
-      console.log('Evolution data:', evolution);
-      console.log('Historical entries:', evolution.filter((d: any) => d.isHistorical));
-      
       setEvolutionData(evolution);
       setSummaryData(summary);
     } catch (error) {

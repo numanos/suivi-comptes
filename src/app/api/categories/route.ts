@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET() {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const rows = await query(`
       SELECT t.id as theme_id, t.name as theme_name, t.display_order,
              c.id as category_id, c.name as category_name, c.theme_id as cat_theme_id,
@@ -51,6 +54,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { name, theme_id, subcategories } = await request.json();
 
     if (!name || !theme_id) {
@@ -84,6 +89,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { id, name, theme_id } = await request.json();
 
     if (!id || !name) {
@@ -104,6 +111,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 

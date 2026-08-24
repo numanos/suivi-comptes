@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { query } from '@/lib/db';
-import { cookies } from 'next/headers';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,13 +14,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cookieStore = await cookies();
-    const authCookie = cookieStore.get('auth');
-    if (!authCookie) {
+    const user = await getCurrentUser();
+    if (!user) {
       return NextResponse.json({ error: 'Non authentifié' }, { status: 401 });
     }
 
-    const userId = authCookie.value;
+    const userId = user.id;
 
     const rows = await query(
       'SELECT id, password_hash FROM users WHERE id = ?',
@@ -31,8 +30,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Utilisateur non trouvé' }, { status: 404 });
     }
 
-    const user = rows[0];
-    const isValid = await bcrypt.compare(oldPassword, user.password_hash);
+    const dbUser = rows[0];
+    const isValid = await bcrypt.compare(oldPassword, dbUser.password_hash);
 
     if (!isValid) {
       return NextResponse.json(
@@ -41,7 +40,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    if (newPassword.length < 12 || newPassword.length > 256) {
+      return NextResponse.json({ error: 'Le nouveau mot de passe doit contenir entre 12 et 256 caractères' }, { status: 400 });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
 
     await query(
       'UPDATE users SET password_hash = ? WHERE id = ?',

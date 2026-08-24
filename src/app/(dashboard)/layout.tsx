@@ -25,6 +25,7 @@ const navigation = [
     items: [
       { name: 'Évolution', href: '/patrimoine', icon: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' },
       { name: 'Enveloppes', href: '/patrimoine/enveloppes', icon: 'M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
+      { name: 'Relevés datés', href: '/patrimoine/releves', icon: 'M8 7V3m8 4V3M4 11h16M5 5h14a1 1 0 011 1v14H4V6a1 1 0 011-1z' },
     ]
   },
   {

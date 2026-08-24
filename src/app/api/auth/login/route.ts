@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { query } from '@/lib/db';
-import { serialize } from 'cookie';
+import { createSession, SESSION_COOKIE, SESSION_TTL_SECONDS } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,22 +36,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const token = await createSession(user.id);
     const response = NextResponse.json({
       success: true,
       user: { id: user.id, email: user.email, name: user.name }
     });
 
     // Set cookie for session
-    response.headers.set(
-      'Set-Cookie',
-      serialize('auth', String(user.id), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-        path: '/',
-      })
-    );
+    response.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: SESSION_TTL_SECONDS,
+      path: '/',
+    });
 
     return response;
   } catch (error) {

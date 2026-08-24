@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, getConnection } from '@/lib/db';
+import { requireUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year');
     const month = searchParams.get('month');
@@ -226,6 +229,8 @@ function parseCSVLine(line: string): string[] {
 }
 
 export async function POST(request: NextRequest) {
+  const user = await requireUser();
+  if (user instanceof NextResponse) return user;
   const connection = await getConnection();
   
   try {
@@ -611,6 +616,8 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { id, libelle, note, category_id, subcategory_id } = await request.json();
 
     if (!id) {
@@ -631,6 +638,8 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const user = await requireUser();
+    if (user instanceof NextResponse) return user;
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const ids = searchParams.get('ids');
