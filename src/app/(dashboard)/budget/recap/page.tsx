@@ -127,7 +127,7 @@ export default function RecapPage() {
   const safeMonthlyData = Array.isArray(monthlyData) ? monthlyData : [];
   
   const lastMonthWithData = safeMonthlyData.reduce((last, d, idx) => {
-    const hasData = Number(d.total_expenses) > 0 || Number(d.total_income) > 0;
+    const hasData = Boolean(d.has_activity) || Number(d.total_expenses) > 0 || Number(d.total_income) > 0 || Number(d.total_savings) > 0;
     if (selectedYear === currentYear) {
       return hasData && (idx + 1) <= currentMonth ? idx + 1 : last;
     }
@@ -145,11 +145,11 @@ export default function RecapPage() {
   const chartData = safeMonthlyData.map((d, idx) => {
     const isFuture = idx + 1 > lastMonthWithData;
     return {
-      name: monthNames[d.month - 1],
+      name: monthNames[Number(d.month) - 1],
       Dépenses: isFuture ? null : Number(d.total_expenses) || 0,
       Revenus: isFuture ? null : Number(d.total_income) || 0,
       Épargne: isFuture ? null : Number(d.total_savings) || 0,
-      Solde: isFuture ? null : d.balance
+      Solde: isFuture ? null : Number(d.balance) || 0
     };
   });
 
