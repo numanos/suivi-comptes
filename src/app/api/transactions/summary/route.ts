@@ -13,24 +13,21 @@ export async function GET(request: NextRequest) {
     if (type === 'monthly') {
       // Get monthly summary for current year or specified year
       const targetYear = year || new Date().getFullYear();
-      console.log('Monthly summary for year:', targetYear);
-      
       const rows = await query(`
         SELECT 
           MONTH(t.date) as month,
           YEAR(t.date) as year,
+          COUNT(*) as transaction_count,
           SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_expenses,
-          SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
+          SUM(CASE WHEN c.name = 'Revenus professionnels' AND t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
           SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_savings
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id
         LEFT JOIN themes th ON c.theme_id = th.id
-        WHERE YEAR(t.date) = ?
+         WHERE t.date >= ? AND t.date < ?
         GROUP BY YEAR(t.date), MONTH(t.date)
         ORDER BY year, month
-      `, [targetYear]) as any[];
-
-      console.log('Monthly rows:', rows);
+      `, [`${targetYear}-01-01`, `${Number(targetYear) + 1}-01-01`]) as any[];
 
       // 1. Get initial balance (last known balance before this year)
       const initialBalanceRows = await query(`
@@ -47,19 +44,19 @@ export async function GET(request: NextRequest) {
           MONTH(t.date) as month,
           t.balance
         FROM transactions t
-        WHERE YEAR(t.date) = ? AND t.balance IS NOT NULL
+         WHERE t.date >= ? AND t.date < ? AND t.balance IS NOT NULL
         ORDER BY t.date ASC, t.id ASC
-      `, [targetYear]) as any[];
+      `, [`${targetYear}-01-01`, `${Number(targetYear) + 1}-01-01`]) as any[];
 
       const lastBalanceByMonth = new Map<number, number>();
       for (const row of balanceRows) {
-        lastBalanceByMonth.set(row.month, Number(row.balance));
+        lastBalanceByMonth.set(Number(row.month), Number(row.balance));
       }
 
       // 3. Merge and fill gaps in summary
       const summary = [];
       for (let m = 1; m <= 12; m++) {
-        const row = rows.find(r => r.month === m);
+        const row = rows.find(r => Number(r.month) === m);
         const monthBalance = lastBalanceByMonth.get(m);
         
         if (monthBalance !== undefined) {
@@ -72,6 +69,7 @@ export async function GET(request: NextRequest) {
           total_expenses: row ? (Number(row.total_expenses) || 0) : 0,
           total_income: row ? (Number(row.total_income) || 0) : 0,
           total_savings: row ? (Number(row.total_savings) || 0) : 0,
+          has_activity: Boolean(row && Number(row.transaction_count) > 0),
           net: row ? (Number(row.total_income) || 0) - (Number(row.total_expenses) || 0) : 0,
           balance: runningBalance
         });
@@ -89,7 +87,7 @@ export async function GET(request: NextRequest) {
         SELECT 
           YEAR(t.date) as year,
           SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_expenses,
-          SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
+          SUM(CASE WHEN c.name = 'Revenus professionnels' AND t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
           SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_savings
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id
@@ -104,7 +102,7 @@ export async function GET(request: NextRequest) {
       const ytdRows = await query(`
         SELECT 
           SUM(CASE WHEN th.name IN ('Dépenses fixes', 'Dépenses variables') AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_expenses,
-          SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
+          SUM(CASE WHEN c.name = 'Revenus professionnels' AND t.amount > 0 THEN t.amount ELSE 0 END) as total_income,
           SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as total_savings
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id
@@ -113,15 +111,15 @@ export async function GET(request: NextRequest) {
       `, [currentYear, currentMonth]) as any[];
 
       const summary = rows.map(row => ({
-        year: row.year,
-        total_expenses: row.total_expenses || 0,
-        total_income: row.total_income || 0,
-        total_savings: row.total_savings || 0,
-        isCurrentYear: row.year === currentYear,
-        ytd: row.year === currentYear ? {
-          total_expenses: ytdRows[0]?.total_expenses || 0,
-          total_income: ytdRows[0]?.total_income || 0,
-          total_savings: ytdRows[0]?.total_savings || 0
+        year: Number(row.year),
+        total_expenses: Number(row.total_expenses) || 0,
+        total_income: Number(row.total_income) || 0,
+        total_savings: Number(row.total_savings) || 0,
+        isCurrentYear: Number(row.year) === currentYear,
+        ytd: Number(row.year) === currentYear ? {
+          total_expenses: Number(ytdRows[0]?.total_expenses) || 0,
+          total_income: Number(ytdRows[0]?.total_income) || 0,
+          total_savings: Number(ytdRows[0]?.total_savings) || 0
         } : null
       }));
 
@@ -257,7 +255,7 @@ export async function GET(request: NextRequest) {
           SUM(CASE WHEN c.name = 'Santé' THEN ABS(t.amount) ELSE 0 END) as sante,
           SUM(CASE WHEN s.name LIKE '%Assurance%' OR c.name LIKE '%Assurance%' THEN ABS(t.amount) ELSE 0 END) as assurances,
           SUM(CASE WHEN th.name = 'Epargne' THEN ABS(t.amount) ELSE 0 END) as epargne,
-          SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as revenus
+           SUM(CASE WHEN c.name = 'Revenus professionnels' AND t.amount > 0 THEN t.amount ELSE 0 END) as revenus
         FROM transactions t
         LEFT JOIN categories c ON t.category_id = c.id
         LEFT JOIN subcategories s ON t.subcategory_id = s.id
