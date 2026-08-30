@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
       
       const fluxData = await query(`
         SELECT 
-          SUM(CASE WHEN th.name = 'Revenus' AND t.amount > 0 THEN t.amount ELSE 0 END) as income,
+          SUM(CASE WHEN c.name = 'Revenus professionnels' AND t.amount > 0 THEN t.amount ELSE 0 END) as income,
           SUM(CASE WHEN th.name = 'Dépenses fixes' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as fixed_expenses,
           SUM(CASE WHEN th.name = 'Dépenses variables' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as var_expenses,
           SUM(CASE WHEN th.name = 'Epargne' AND t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as savings
